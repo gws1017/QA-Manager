@@ -6,9 +6,15 @@ export async function GET(req: Request) {
   const moduleId = searchParams.get('module_id');
   const db = getDb();
 
-  const query = moduleId
-    ? db.prepare('SELECT * FROM test_cases WHERE module_id = ? ORDER BY tc_id').all(moduleId)
-    : db.prepare('SELECT * FROM test_cases ORDER BY module_id, tc_id').all();
+  const sql = `
+    SELECT tc.*, COUNT(s.id) as screenshot_count
+    FROM test_cases tc
+    LEFT JOIN screenshots s ON s.test_case_id = tc.id
+    ${moduleId ? 'WHERE tc.module_id = ?' : ''}
+    GROUP BY tc.id
+    ORDER BY tc.tc_id
+  `;
+  const query = moduleId ? db.prepare(sql).all(moduleId) : db.prepare(sql).all();
 
   return NextResponse.json(query);
 }
