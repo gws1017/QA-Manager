@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Download, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Download, Upload, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
 type Module = { id: number; name: string; description: string };
 type TC = {
@@ -30,6 +30,7 @@ export default function Home() {
   const [tcs, setTcs] = useState<TC[]>([]);
   const [newModName, setNewModName] = useState('');
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => { fetchModules(); }, []);
   useEffect(() => { if (selectedModule) fetchTCs(selectedModule); }, [selectedModule]);
@@ -66,6 +67,20 @@ export default function Home() {
     if (!confirm('삭제할까요?')) return;
     await fetch(`/api/testcases/${id}`, { method: 'DELETE' });
     fetchTCs(selectedModule!);
+  }
+
+  async function importExcel(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch('/api/import', { method: 'POST', body: form });
+    const data = await res.json();
+    setImporting(false);
+    e.target.value = '';
+    alert(`Import 완료\n업데이트: ${data.updated}건\n신규: ${data.inserted}건`);
+    if (selectedModule) fetchTCs(selectedModule);
   }
 
   async function updateTC(id: number, field: string, value: string) {
@@ -128,6 +143,10 @@ export default function Home() {
               className="flex items-center gap-1 px-3 py-1.5 bg-[#1f3864] text-white rounded hover:bg-[#2a4f8a] text-xs">
               <Plus size={13} /> TC 추가
             </button>
+            <label className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs cursor-pointer text-white ${importing ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}>
+              <Upload size={13} /> {importing ? '처리중...' : '엑셀 Import'}
+              <input type="file" accept=".xlsx" className="hidden" onChange={importExcel} disabled={importing} />
+            </label>
             <a href="/api/export"
               className="flex items-center gap-1 px-3 py-1.5 bg-green-700 text-white rounded hover:bg-green-800 text-xs">
               <Download size={13} /> 엑셀 Export
