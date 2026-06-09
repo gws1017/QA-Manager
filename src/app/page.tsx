@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Download, Upload, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Download, Upload, Plus, Trash2, ChevronDown, ChevronUp, CheckSquare, Square } from 'lucide-react';
 
 type Module = { id: number; name: string; description: string };
 type TC = {
@@ -31,9 +31,10 @@ export default function Home() {
   const [newModName, setNewModName] = useState('');
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [importing, setImporting] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
 
   useEffect(() => { fetchModules(); }, []);
-  useEffect(() => { if (selectedModule) fetchTCs(selectedModule); }, [selectedModule]);
+  useEffect(() => { if (selectedModule) { fetchTCs(selectedModule); setSelected(new Set()); } }, [selectedModule]);
 
   async function fetchModules() {
     const res = await fetch('/api/modules');
@@ -89,6 +90,31 @@ export default function Home() {
     setTcs(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
   }
 
+  async function bulkAction(action: 'delete' | 'result', result?: string) {
+    const ids = Array.from(selected);
+    if (!ids.length) return;
+    if (action === 'delete' && !confirm(`${ids.length}건을 삭제할까요?`)) return;
+    await fetch('/api/testcases/bulk', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, action, result }),
+    });
+    setSelected(new Set());
+    if (selectedModule) fetchTCs(selectedModule);
+  }
+
+  function toggleSelect(id: number) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected(prev => prev.size === tcs.length ? new Set() : new Set(tcs.map(t => t.id)));
+  }
+
+  const allSelected = tcs.length > 0 && selected.size === tcs.length;
   const stats = {
     total: tcs.length,
     pass: tcs.filter(t => t.result === 'Pass').length,
@@ -114,15 +140,15 @@ export default function Home() {
             <input value={newModName} onChange={e => setNewModName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addModule()}
               placeholder="새 모듈명" className="flex-1 px-2 py-1 text-xs text-black rounded" />
-            <button onClick={addModule} className="px-2 py-1 bg-white/20 rounded hover:bg-white/30 text-white">
+            <button onClick={addModule} className="px-2 py-1 bg-white/20 rounded hover:bg-white/30">
               <Plus size={14} />
             </button>
           </div>
         </div>
       </aside>
 
-      {/* 메인 */}
       <main className="flex-1 flex flex-col overflow-hidden">
+        {/* 상단 헤더 */}
         <header className="bg-white border-b px-6 py-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
             <h1 className="font-bold text-gray-800">{modules.find(m => m.id === selectedModule)?.name ?? ''}</h1>
@@ -139,25 +165,52 @@ export default function Home() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={addTC}
-              className="flex items-center gap-1 px-3 py-1.5 bg-[#1f3864] text-white rounded hover:bg-[#2a4f8a] text-xs">
+            <button onClick={addTC} className="flex items-center gap-1 px-3 py-1.5 bg-[#1f3864] text-white rounded hover:bg-[#2a4f8a] text-xs">
               <Plus size={13} /> TC 추가
             </button>
             <label className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs cursor-pointer text-white ${importing ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}>
               <Upload size={13} /> {importing ? '처리중...' : '엑셀 Import'}
               <input type="file" accept=".xlsx" className="hidden" onChange={importExcel} disabled={importing} />
             </label>
-            <a href="/api/export"
-              className="flex items-center gap-1 px-3 py-1.5 bg-green-700 text-white rounded hover:bg-green-800 text-xs">
+            <a href="/api/export" className="flex items-center gap-1 px-3 py-1.5 bg-green-700 text-white rounded hover:bg-green-800 text-xs">
               <Download size={13} /> 엑셀 Export
             </a>
           </div>
         </header>
 
+        {/* 일괄 처리 툴바 - 선택된 항목 있을 때만 표시 */}
+        {selected.size > 0 && (
+          <div className="bg-blue-50 border-b border-blue-200 px-6 py-2 flex items-center gap-3 shrink-0">
+            <span className="text-blue-700 font-semibold text-xs">{selected.size}건 선택됨</span>
+            <span className="text-gray-300">|</span>
+            <span className="text-xs text-gray-500">결과 일괄 변경:</span>
+            {RESULTS.map(r => (
+              <button key={r} onClick={() => bulkAction('result', r)}
+                className={`px-2.5 py-1 rounded text-xs font-medium ${RESULT_STYLE[r]} hover:opacity-80`}>
+                {r}
+              </button>
+            ))}
+            <span className="text-gray-300">|</span>
+            <button onClick={() => bulkAction('delete')}
+              className="flex items-center gap-1 px-2.5 py-1 rounded text-xs bg-red-100 text-red-700 hover:bg-red-200 font-medium">
+              <Trash2 size={12} /> 일괄 삭제
+            </button>
+            <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-gray-400 hover:text-gray-600">
+              선택 해제
+            </button>
+          </div>
+        )}
+
+        {/* 테이블 */}
         <div className="flex-1 overflow-auto">
           <table className="w-full border-collapse text-xs">
             <thead className="sticky top-0 bg-[#1f3864] text-white z-10">
               <tr>
+                <th className="px-3 py-2 w-8">
+                  <button onClick={toggleAll} className="text-white/80 hover:text-white">
+                    {allSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                  </button>
+                </th>
                 {['ID','대분류','중분류','소분류','재현스텝','기대결과','결과','실제결과','비고',''].map((h,i) => (
                   <th key={i} className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-white/10 last:border-0">{h}</th>
                 ))}
@@ -167,8 +220,13 @@ export default function Home() {
               {tcs.map(tc => (
                 <>
                   <tr key={tc.id}
-                    className={`border-b border-gray-200 hover:brightness-95 cursor-pointer ${ROW_STYLE[tc.result] ?? ''}`}
+                    className={`border-b border-gray-200 hover:brightness-95 cursor-pointer ${selected.has(tc.id) ? 'ring-2 ring-inset ring-blue-400' : ''} ${ROW_STYLE[tc.result] ?? ''}`}
                     onClick={() => setExpandedId(expandedId === tc.id ? null : tc.id)}>
+                    <td className="px-3 py-2" onClick={e => { e.stopPropagation(); toggleSelect(tc.id); }}>
+                      <div className="text-blue-500 hover:text-blue-700">
+                        {selected.has(tc.id) ? <CheckSquare size={14} /> : <Square size={14} className="text-gray-300 hover:text-gray-500" />}
+                      </div>
+                    </td>
                     <td className="px-3 py-2 font-mono font-semibold whitespace-nowrap">{tc.tc_id}</td>
                     <td className="px-3 py-2 max-w-[100px] truncate" title={tc.category}>{tc.category}</td>
                     <td className="px-3 py-2 max-w-[120px] truncate" title={tc.sub_category}>{tc.sub_category}</td>
@@ -185,8 +243,7 @@ export default function Home() {
                     <td className="px-3 py-2 max-w-[150px] truncate" title={tc.note}>{tc.note}</td>
                     <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => deleteTC(tc.id)}
-                          className="p-1 rounded hover:bg-red-100 text-red-300 hover:text-red-600">
+                        <button onClick={() => deleteTC(tc.id)} className="p-1 rounded hover:bg-red-100 text-red-300 hover:text-red-600">
                           <Trash2 size={13} />
                         </button>
                         {expandedId === tc.id ? <ChevronUp size={13} className="text-gray-400" /> : <ChevronDown size={13} className="text-gray-400" />}
@@ -195,7 +252,7 @@ export default function Home() {
                   </tr>
                   {expandedId === tc.id && (
                     <tr key={`${tc.id}-exp`} className="bg-white border-b border-gray-200">
-                      <td colSpan={10} className="px-8 py-4">
+                      <td colSpan={11} className="px-8 py-4">
                         <div className="grid grid-cols-2 gap-4 max-w-4xl">
                           {([
                             ['tc_id','TC ID',false], ['category','대분류',false],
@@ -218,7 +275,7 @@ export default function Home() {
                 </>
               ))}
               {tcs.length === 0 && (
-                <tr><td colSpan={10} className="text-center py-20 text-gray-400">
+                <tr><td colSpan={11} className="text-center py-20 text-gray-400">
                   TC가 없습니다. 상단의 TC 추가 버튼을 눌러주세요.
                 </td></tr>
               )}
