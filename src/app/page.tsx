@@ -150,6 +150,14 @@ export default function Home() {
     setNewModName(''); fetchModules();
   }
 
+  async function deleteModule(id: number) {
+    const mod = modules.find(m => m.id === id);
+    if (!confirm(`"${mod?.name}" 탭을 삭제할까요?\n포함된 테스트케이스도 모두 삭제됩니다.`)) return;
+    await fetch(`/api/modules/${id}`, { method: 'DELETE' });
+    if (selectedModule === id) setSelectedModule(null);
+    fetchModules();
+  }
+
   async function addTC() {
     if (!selectedModule) return;
     await fetch('/api/testcases', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -214,22 +222,33 @@ export default function Home() {
 
   return (
     <div className="flex h-screen bg-gray-50 text-sm">
-      <aside className="w-52 bg-[#1f3864] text-white flex flex-col shrink-0">
+      <aside className="w-56 bg-[#1f3864] text-white flex flex-col shrink-0">
         <div className="px-4 py-5 text-base font-bold border-b border-white/20">QA Manager</div>
         <nav className="flex-1 overflow-y-auto py-2">
           {modules.map(m => (
-            <button key={m.id} onClick={() => setSelectedModule(m.id)}
-              className={`w-full text-left px-4 py-2.5 hover:bg-white/10 transition-colors ${selectedModule === m.id ? 'bg-white/20 font-semibold' : ''}`}>
-              {m.name}
-            </button>
+            <div key={m.id}
+              className={`group flex items-center hover:bg-white/10 transition-colors ${selectedModule === m.id ? 'bg-white/20 font-semibold' : ''}`}>
+              <button onClick={() => setSelectedModule(m.id)}
+                className="flex-1 text-left px-4 py-2.5 text-sm truncate">
+                {m.name}
+              </button>
+              <button onClick={() => deleteModule(m.id)}
+                className="mr-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/40 text-white/60 hover:text-white transition-all shrink-0">
+                <X size={12} />
+              </button>
+            </div>
           ))}
         </nav>
-        <div className="p-3 border-t border-white/20">
-          <div className="flex gap-1">
+        <div className="px-3 pt-3 pb-10 border-t border-white/20">
+          <div className="flex gap-1 w-full">
             <input value={newModName} onChange={e => setNewModName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addModule()}
-              placeholder="새 모듈명" className="flex-1 px-2 py-1 text-xs text-black rounded" />
-            <button onClick={addModule} className="px-2 py-1 bg-white/20 rounded hover:bg-white/30"><Plus size={14} /></button>
+              placeholder="새 탭 이름"
+              className="min-w-0 flex-1 px-2 py-1 text-xs text-white bg-white/10 placeholder-white/40 rounded border border-white/20 focus:outline-none focus:border-white/50" />
+            <button onClick={addModule}
+              className="w-8 h-7 flex items-center justify-center bg-white/20 rounded hover:bg-white/30 shrink-0">
+              <Plus size={14} />
+            </button>
           </div>
         </div>
       </aside>
