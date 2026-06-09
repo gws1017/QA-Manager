@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
-import { Download, Upload, Plus, Trash2, ChevronDown, ChevronUp, CheckSquare, Square, Paperclip, X, ImageIcon } from 'lucide-react';
+import { Download, Upload, Plus, Trash2, ChevronDown, ChevronUp, CheckSquare, Square, Paperclip, X, ImageIcon, Copy } from 'lucide-react';
 
 type Module = { id: number; name: string; description: string };
 type TC = {
@@ -161,6 +161,11 @@ export default function Home() {
   async function deleteTC(id: number) {
     if (!confirm('삭제할까요?')) return;
     await fetch(`/api/testcases/${id}`, { method: 'DELETE' });
+    fetchTCs(selectedModule!);
+  }
+
+  async function duplicateTC(id: number) {
+    await fetch(`/api/testcases/${id}`, { method: 'POST' });
     fetchTCs(selectedModule!);
   }
 
@@ -326,7 +331,10 @@ export default function Home() {
                     <td className="px-3 py-2 max-w-[150px] truncate" title={tc.note}>{tc.note}</td>
                     <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => deleteTC(tc.id)} className="p-1 rounded hover:bg-red-100 text-red-300 hover:text-red-600">
+                        <button onClick={() => duplicateTC(tc.id)} title="복제" className="p-1 rounded hover:bg-blue-100 text-gray-300 hover:text-blue-500">
+                          <Copy size={13} />
+                        </button>
+                        <button onClick={() => deleteTC(tc.id)} title="삭제" className="p-1 rounded hover:bg-red-100 text-red-300 hover:text-red-600">
                           <Trash2 size={13} />
                         </button>
                         {expandedId === tc.id ? <ChevronUp size={13} className="text-gray-400" /> : <ChevronDown size={13} className="text-gray-400" />}

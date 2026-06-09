@@ -22,3 +22,21 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   getDb().prepare('DELETE FROM test_cases WHERE id = ?').run(id);
   return NextResponse.json({ ok: true });
 }
+
+export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const db = getDb();
+
+  const src = db.prepare('SELECT * FROM test_cases WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+  if (!src) return NextResponse.json({ error: 'not found' }, { status: 404 });
+
+  // 같은 모듈 내 tc_id 중 복제 번호 계산 (예: TC-03 → TC-03 (복사))
+  const newTcId = `${src.tc_id} (복사)`;
+
+  const res = db.prepare(`
+    INSERT INTO test_cases (module_id, tc_id, category, sub_category, detail, steps, expected, result, actual_result, note, priority)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'No Run', '', '', ?)
+  `).run(src.module_id, newTcId, src.category, src.sub_category, src.detail, src.steps, src.expected, src.priority);
+
+  return NextResponse.json({ id: res.lastInsertRowid });
+}
