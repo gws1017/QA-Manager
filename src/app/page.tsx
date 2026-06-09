@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Download, Upload, Plus, Trash2, ChevronDown, ChevronUp, CheckSquare, Square, Paperclip, X, ImageIcon } from 'lucide-react';
 
 type Module = { id: number; name: string; description: string };
@@ -294,8 +294,8 @@ export default function Home() {
             </thead>
             <tbody>
               {tcs.map(tc => (
-                <>
-                  <tr key={tc.id}
+                <React.Fragment key={tc.id}>
+                  <tr
                     className={`border-b border-gray-200 hover:brightness-95 cursor-pointer ${selected.has(tc.id) ? 'ring-2 ring-inset ring-blue-400' : ''} ${ROW_STYLE[tc.result] ?? ''}`}
                     onClick={() => setExpandedId(expandedId === tc.id ? null : tc.id)}>
                     <td className="px-3 py-2" onClick={e => { e.stopPropagation(); toggleSelect(tc.id); }}>
@@ -334,7 +334,7 @@ export default function Home() {
                     </td>
                   </tr>
                   {expandedId === tc.id && (
-                    <tr key={`${tc.id}-exp`} className="bg-white border-b border-gray-200">
+                    <tr className="bg-white border-b border-gray-200">
                       <td colSpan={11} className="px-8 py-4">
                         <div className="grid grid-cols-2 gap-4 max-w-4xl">
                           {([
@@ -356,7 +356,7 @@ export default function Home() {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
               {tcs.length === 0 && (
                 <tr><td colSpan={11} className="text-center py-20 text-gray-400">
