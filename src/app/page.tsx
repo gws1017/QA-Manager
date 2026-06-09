@@ -152,9 +152,8 @@ export default function Home() {
 
   async function addTC() {
     if (!selectedModule) return;
-    const nextId = `TC-${String(tcs.length + 1).padStart(2, '0')}`;
     await fetch('/api/testcases', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ module_id: selectedModule, tc_id: nextId }) });
+      body: JSON.stringify({ module_id: selectedModule }) });
     fetchTCs(selectedModule);
   }
 
@@ -346,7 +345,7 @@ export default function Home() {
                       <td colSpan={11} className="px-8 py-4">
                         <div className="grid grid-cols-2 gap-4 max-w-4xl">
                           {([
-                            ['tc_id','TC ID',false], ['category','대분류',false],
+                            ['category','대분류',false],
                             ['sub_category','중분류',false], ['detail','소분류',false],
                             ['steps','재현스텝',true], ['expected','기대결과',true],
                             ['actual_result','실제결과',false], ['note','비고',false],

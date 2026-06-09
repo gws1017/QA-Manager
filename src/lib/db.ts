@@ -14,6 +14,16 @@ export function getDb(): Database.Database {
   return db;
 }
 
+/** 모듈 내 TC를 id(삽입순) 기준으로 TC-001, TC-002... 재번호 부여 */
+export function renumberModule(moduleId: number | string) {
+  const db = getDb();
+  const tcs = db.prepare('SELECT id FROM test_cases WHERE module_id = ? ORDER BY id ASC').all(moduleId) as { id: number }[];
+  const update = db.prepare('UPDATE test_cases SET tc_id = ? WHERE id = ?');
+  db.transaction(() => {
+    tcs.forEach((tc, i) => update.run(`TC-${String(i + 1).padStart(3, '0')}`, tc.id));
+  })();
+}
+
 function initSchema(db: Database.Database) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS modules (

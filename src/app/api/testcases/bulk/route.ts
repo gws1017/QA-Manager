@@ -1,4 +1,4 @@
-import { getDb } from '@/lib/db';
+import { getDb, renumberModule } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
@@ -9,7 +9,9 @@ export async function POST(req: Request) {
   const placeholders = ids.map(() => '?').join(',');
 
   if (action === 'delete') {
+    const affected = db.prepare(`SELECT DISTINCT module_id FROM test_cases WHERE id IN (${placeholders})`).all(...ids) as { module_id: number }[];
     db.prepare(`DELETE FROM test_cases WHERE id IN (${placeholders})`).run(...ids);
+    affected.forEach(({ module_id }) => renumberModule(module_id));
     return NextResponse.json({ ok: true, count: ids.length });
   }
 
