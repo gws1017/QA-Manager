@@ -531,18 +531,6 @@ export default function Home() {
       <aside className="w-60 bg-[#1f3864] text-white flex flex-col shrink-0">
         <div className="px-4 py-3 border-b border-white/20 flex items-center justify-between">
           <span className="text-base font-bold tracking-wide">QA Manager</span>
-<<<<<<< HEAD
-          <button onClick={() => setShowHelp(true)} title="사용 가이드" className="p-1 rounded hover:bg-white/20 text-white/60 hover:text-white">
-            <HelpCircle size={16} />
-          </button>
-=======
-          <div className="flex items-center gap-2">
-            {userId && <span className="text-xs text-white/60 truncate max-w-[80px]">{userId}</span>}
-            <button onClick={logout} title="로그아웃" className="p-1 rounded hover:bg-white/20 text-white/60 hover:text-white">
-              <LogOut size={14} />
-            </button>
-          </div>
->>>>>>> 4756d6c (도움말 위치 수정)
         </div>
         {/* 뷰 전환 탭 */}
         <div className="flex border-b border-white/20 shrink-0">
