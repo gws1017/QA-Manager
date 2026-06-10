@@ -16,9 +16,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = getDb();
-  const iss = db.prepare('SELECT project_id FROM issues WHERE id=?').get(id) as { project_id: number } | undefined;
+  const iss = db.prepare('SELECT issue_project_id FROM issues WHERE id=?').get(id) as { issue_project_id: number } | undefined;
   if (!iss) return NextResponse.json({ error: 'not found' }, { status: 404 });
   db.prepare('DELETE FROM issues WHERE id=?').run(id);
-  renumberIssues(iss.project_id);
+  renumberIssues(iss.issue_project_id);
   return NextResponse.json({ ok: true });
 }

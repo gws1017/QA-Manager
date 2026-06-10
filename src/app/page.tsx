@@ -30,7 +30,7 @@ const ROW_STYLE: Record<string, string> = {
 };
 
 /* ───────── TC에 연결된 이슈 패널 ───────── */
-type LinkedIssue = { id: number; issue_id: string; title: string; status: string; priority: string; type: string; project_id: number };
+type LinkedIssue = { id: number; issue_id: string; title: string; status: string; priority: string; type: string; issue_project_id: number };
 const STATUS_STYLE_MINI: Record<string, string> = {
   'Open': 'bg-gray-100 text-gray-600', 'In Progress': 'bg-blue-100 text-blue-700',
   'Resolved': 'bg-green-100 text-green-700', 'Closed': 'bg-gray-200 text-gray-500',
@@ -56,7 +56,7 @@ function LinkedIssuesPanel({ tcId, onNavigateToIssue }: {
       <div className="flex flex-wrap gap-1.5">
         {issues.map(iss => (
           <button key={iss.id}
-            onClick={() => onNavigateToIssue(iss.project_id, iss.id)}
+            onClick={() => onNavigateToIssue(iss.issue_project_id, iss.id)}
             className="inline-flex items-center gap-1.5 px-2 py-1 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700 hover:bg-orange-100 transition-colors"
             title="해당 이슈로 이동">
             <span className={`font-bold text-[10px] ${PRIORITY_DOT[iss.priority]}`}>●</span>
@@ -151,12 +151,14 @@ function ScreenshotPanel({ tcId }: { tcId: number }) {
 
 /* ───────── 메인 ───────── */
 export default function Home() {
-  const [projects, setProjects]           = useState<Project[]>([]);
+  const [projects, setProjects]           = useState<Project[]>([]);       // TC 전용
+  const [issueProjects, setIssueProjects] = useState<Project[]>([]);       // 이슈 전용
   const [modules, setModules]             = useState<Module[]>([]);
   const [view, setView] = useState<'tc' | 'issue'>('tc');
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
-  const [selectedModule, setSelectedModule]     = useState<number | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [selectedModule, setSelectedModule]         = useState<number | null>(null);
+  const [selectedProjectId, setSelectedProjectId]   = useState<number | null>(null); // TC 프로젝트
+  const [selectedIssueProjectId, setSelectedIssueProjectId] = useState<number | null>(null); // 이슈 프로젝트
   const [tcs, setTcs]                     = useState<TC[]>([]);
   const [expandedId, setExpandedId]       = useState<number | null>(null);
   const [importing, setImporting]         = useState(false);
@@ -197,17 +199,22 @@ export default function Home() {
   }, [tcs]);
 
   async function fetchAll() {
-    const [pRes, mRes] = await Promise.all([fetch('/api/projects'), fetch('/api/modules')]);
-    const projs: Project[] = await pRes.json();
-    const mods: Module[]   = await mRes.json();
+    const [pRes, mRes, ipRes] = await Promise.all([
+      fetch('/api/projects'), fetch('/api/modules'), fetch('/api/issue-projects'),
+    ]);
+    const projs: Project[]  = await pRes.json();
+    const mods: Module[]    = await mRes.json();
+    const iProjs: Project[] = await ipRes.json();
     setProjects(projs);
     setModules(mods);
-    // 첫 로드: 프로젝트 전부 펼치기
+    setIssueProjects(iProjs);
     setExpandedProjects(new Set(projs.map(p => p.id)));
-    // 첫 번째 모듈 자동 선택
     if (mods.length > 0 && !selectedModule) {
       setSelectedModule(mods[0].id);
       setSelectedProjectId(mods[0].project_id);
+    }
+    if (iProjs.length > 0 && !selectedIssueProjectId) {
+      setSelectedIssueProjectId(iProjs[0].id);
     }
   }
 
@@ -245,6 +252,28 @@ export default function Home() {
     fetchAll();
   }
 
+  /* 이슈 프로젝트 */
+  const [newIssueProjectName, setNewIssueProjectName] = useState('');
+  async function addIssueProject() {
+    if (!newIssueProjectName.trim()) return;
+    await fetch('/api/issue-projects', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newIssueProjectName }) });
+    setNewIssueProjectName(''); fetchAll();
+  }
+  async function deleteIssueProject(id: number) {
+    const proj = issueProjects.find(p => p.id === id);
+    if (!confirm(`"${proj?.name}" 이슈 프로젝트를 삭제할까요?\n포함된 이슈가 모두 삭제됩니다.`)) return;
+    await fetch(`/api/issue-projects/${id}`, { method: 'DELETE' });
+    if (selectedIssueProjectId === id) setSelectedIssueProjectId(null);
+    fetchAll();
+  }
+  async function renameIssueProject(id: number, name: string) {
+    if (!name.trim()) return;
+    await fetch(`/api/issue-projects/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim() }) });
+    setRenaming(null); fetchAll();
+  }
+
   /* 모듈 */
   async function addModule(projectId: number) {
     if (!newModuleName.trim()) return;
@@ -280,11 +309,10 @@ export default function Home() {
     }
   }
 
-  function navigateToIssue(projectId: number, issueId: number) {
-    setSelectedProjectId(projectId);
+  function navigateToIssue(issueProjectId: number, issueId: number) {
+    setSelectedIssueProjectId(issueProjectId);
     setJumpToIssueId(issueId);
     setView('issue');
-    // 다음 렌더 후 초기화 (한 번만 점프)
     setTimeout(() => setJumpToIssueId(null), 500);
   }
 
@@ -374,92 +402,116 @@ export default function Home() {
           </button>
         </div>
 
-        {/* 프로젝트 & 탭 트리 */}
-        <nav className="flex-1 overflow-y-auto py-2 space-y-0.5">
-          {projects.map(proj => {
-            const projModules = modules.filter(m => m.project_id === proj.id);
-            const isOpen = expandedProjects.has(proj.id);
-            return (
-              <div key={proj.id}>
-                {/* 프로젝트 행 */}
-                <div className="group flex items-center px-2 py-1.5 hover:bg-white/10 cursor-pointer rounded mx-1"
-                  onClick={() => toggleProject(proj.id)}>
-                  <button className="text-white/60 hover:text-white mr-1 shrink-0" onClick={e => { e.stopPropagation(); toggleProject(proj.id); }}>
-                    {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                  </button>
-                  {isOpen
-                    ? <FolderOpen size={14} className="mr-2 text-yellow-300 shrink-0" onClick={e => { e.stopPropagation(); setSelectedProjectId(proj.id); }} />
-                    : <Folder    size={14} className="mr-2 text-yellow-300 shrink-0" onClick={e => { e.stopPropagation(); setSelectedProjectId(proj.id); }} />}
-                  {renaming?.type === 'project' && renaming.id === proj.id ? (
-                    <input autoFocus value={renaming.value}
-                      onChange={e => setRenaming({ ...renaming, value: e.target.value })}
-                      onBlur={() => renameProject(proj.id, renaming.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') renameProject(proj.id, renaming.value); if (e.key === 'Escape') setRenaming(null); }}
-                      onClick={e => e.stopPropagation()}
-                      className="flex-1 min-w-0 px-1 py-0 text-sm font-semibold bg-white/20 text-white rounded border border-white/40 focus:outline-none" />
-                  ) : (
-                    <span className="flex-1 text-sm font-semibold truncate"
-                      onDoubleClick={e => { e.stopPropagation(); setRenaming({ type: 'project', id: proj.id, value: proj.name }); }}>
-                      {proj.name}
-                    </span>
-                  )}
-                  {/* 탭 추가 */}
-                  <button title="탭 추가"
-                    onClick={e => { e.stopPropagation(); setAddingModuleFor(addingModuleFor === proj.id ? null : proj.id); setNewModuleName(''); }}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/20 text-white/60 hover:text-white shrink-0">
-                    <Plus size={12} />
-                  </button>
-                  {/* 프로젝트 삭제 */}
-                  <button title="프로젝트 삭제"
-                    onClick={e => { e.stopPropagation(); deleteProject(proj.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/40 text-white/60 hover:text-white shrink-0">
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-
-                {/* 탭 추가 입력 */}
-                {addingModuleFor === proj.id && (
-                  <div className="mx-3 mb-1 flex gap-1" onClick={e => e.stopPropagation()}>
-                    <input autoFocus value={newModuleName} onChange={e => setNewModuleName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') addModule(proj.id); if (e.key === 'Escape') setAddingModuleFor(null); }}
-                      placeholder="새 탭 이름"
-                      className="min-w-0 flex-1 px-2 py-1 text-xs text-white bg-white/10 placeholder-white/40 rounded border border-white/30 focus:outline-none focus:border-white/60" />
-                    <button onClick={() => addModule(proj.id)} className="px-2 py-1 bg-white/20 rounded hover:bg-white/30 text-xs shrink-0">추가</button>
-                  </div>
-                )}
-
-                {/* 탭 목록 */}
-                {isOpen && projModules.map(mod => (
-                  <div key={mod.id}
-                    className={`group flex items-center pl-8 pr-2 py-1.5 cursor-pointer hover:bg-white/10 rounded mx-1
-                      ${selectedModule === mod.id ? 'bg-white/20 font-semibold' : ''}`}
-                    onClick={() => { setSelectedModule(mod.id); setSelectedProjectId(proj.id); }}>
-                    {renaming?.type === 'module' && renaming.id === mod.id ? (
+        {/* ── TC 뷰: 프로젝트 + 탭 트리 ── */}
+        {view === 'tc' && (
+          <nav className="flex-1 overflow-y-auto py-2 space-y-0.5">
+            {projects.map(proj => {
+              const projModules = modules.filter(m => m.project_id === proj.id);
+              const isOpen = expandedProjects.has(proj.id);
+              return (
+                <div key={proj.id}>
+                  <div className="group flex items-center px-2 py-1.5 hover:bg-white/10 cursor-pointer rounded mx-1"
+                    onClick={() => toggleProject(proj.id)}>
+                    <button className="text-white/60 hover:text-white mr-1 shrink-0" onClick={e => { e.stopPropagation(); toggleProject(proj.id); }}>
+                      {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </button>
+                    {isOpen
+                      ? <FolderOpen size={14} className="mr-2 text-yellow-300 shrink-0" />
+                      : <Folder    size={14} className="mr-2 text-yellow-300 shrink-0" />}
+                    {renaming?.type === 'project' && renaming.id === proj.id ? (
                       <input autoFocus value={renaming.value}
                         onChange={e => setRenaming({ ...renaming, value: e.target.value })}
-                        onBlur={() => renameModule(mod.id, renaming.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') renameModule(mod.id, renaming.value); if (e.key === 'Escape') setRenaming(null); }}
+                        onBlur={() => renameProject(proj.id, renaming.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') renameProject(proj.id, renaming.value); if (e.key === 'Escape') setRenaming(null); }}
                         onClick={e => e.stopPropagation()}
-                        className="flex-1 min-w-0 px-1 py-0 text-xs bg-white/20 text-white rounded border border-white/40 focus:outline-none" />
+                        className="flex-1 min-w-0 px-1 py-0 text-sm font-semibold bg-white/20 text-white rounded border border-white/40 focus:outline-none" />
                     ) : (
-                      <span className="flex-1 text-xs truncate"
-                        onDoubleClick={e => { e.stopPropagation(); setRenaming({ type: 'module', id: mod.id, value: mod.name }); }}>
-                        {mod.name}
+                      <span className="flex-1 text-sm font-semibold truncate"
+                        onDoubleClick={e => { e.stopPropagation(); setRenaming({ type: 'project', id: proj.id, value: proj.name }); }}>
+                        {proj.name}
                       </span>
                     )}
-                    <button onClick={e => { e.stopPropagation(); deleteModule(mod.id); }}
+                    <button title="탭 추가" onClick={e => { e.stopPropagation(); setAddingModuleFor(addingModuleFor === proj.id ? null : proj.id); setNewModuleName(''); }}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/20 text-white/60 hover:text-white shrink-0">
+                      <Plus size={12} />
+                    </button>
+                    <button title="프로젝트 삭제" onClick={e => { e.stopPropagation(); deleteProject(proj.id); }}
                       className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/40 text-white/60 hover:text-white shrink-0">
-                      <X size={11} />
+                      <Trash2 size={12} />
                     </button>
                   </div>
-                ))}
-              </div>
-            );
-          })}
-        </nav>
+                  {addingModuleFor === proj.id && (
+                    <div className="mx-3 mb-1 flex gap-1" onClick={e => e.stopPropagation()}>
+                      <input autoFocus value={newModuleName} onChange={e => setNewModuleName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') addModule(proj.id); if (e.key === 'Escape') setAddingModuleFor(null); }}
+                        placeholder="새 탭 이름"
+                        className="min-w-0 flex-1 px-2 py-1 text-xs text-white bg-white/10 placeholder-white/40 rounded border border-white/30 focus:outline-none focus:border-white/60" />
+                      <button onClick={() => addModule(proj.id)} className="px-2 py-1 bg-white/20 rounded hover:bg-white/30 text-xs shrink-0">추가</button>
+                    </div>
+                  )}
+                  {isOpen && projModules.map(mod => (
+                    <div key={mod.id}
+                      className={`group flex items-center pl-8 pr-2 py-1.5 cursor-pointer hover:bg-white/10 rounded mx-1
+                        ${selectedModule === mod.id ? 'bg-white/20 font-semibold' : ''}`}
+                      onClick={() => { setSelectedModule(mod.id); setSelectedProjectId(proj.id); }}>
+                      {renaming?.type === 'module' && renaming.id === mod.id ? (
+                        <input autoFocus value={renaming.value}
+                          onChange={e => setRenaming({ ...renaming, value: e.target.value })}
+                          onBlur={() => renameModule(mod.id, renaming.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') renameModule(mod.id, renaming.value); if (e.key === 'Escape') setRenaming(null); }}
+                          onClick={e => e.stopPropagation()}
+                          className="flex-1 min-w-0 px-1 py-0 text-xs bg-white/20 text-white rounded border border-white/40 focus:outline-none" />
+                      ) : (
+                        <span className="flex-1 text-xs truncate"
+                          onDoubleClick={e => { e.stopPropagation(); setRenaming({ type: 'module', id: mod.id, value: mod.name }); }}>
+                          {mod.name}
+                        </span>
+                      )}
+                      <button onClick={e => { e.stopPropagation(); deleteModule(mod.id); }}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/40 text-white/60 hover:text-white shrink-0">
+                        <X size={11} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </nav>
+        )}
 
-        {/* 프로젝트 추가 */}
-        <div className="px-3 pt-3 pb-6 border-t border-white/20">
+        {/* ── 이슈 뷰: 이슈 전용 프로젝트 목록 ── */}
+        {view === 'issue' && (
+          <nav className="flex-1 overflow-y-auto py-2 space-y-0.5">
+            {issueProjects.map(proj => (
+              <div key={proj.id}
+                className={`group flex items-center px-3 py-2.5 cursor-pointer hover:bg-white/10 rounded mx-1 transition-colors
+                  ${selectedIssueProjectId === proj.id ? 'bg-white/20 font-semibold' : ''}`}
+                onClick={() => setSelectedIssueProjectId(proj.id)}>
+                <FolderOpen size={14} className="mr-2 text-orange-300 shrink-0" />
+                {renaming?.type === 'project' && renaming.id === proj.id ? (
+                  <input autoFocus value={renaming.value}
+                    onChange={e => setRenaming({ ...renaming, value: e.target.value })}
+                    onBlur={() => renameIssueProject(proj.id, renaming.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') renameIssueProject(proj.id, renaming.value); if (e.key === 'Escape') setRenaming(null); }}
+                    onClick={e => e.stopPropagation()}
+                    className="flex-1 min-w-0 px-1 py-0 text-sm bg-white/20 text-white rounded border border-white/40 focus:outline-none" />
+                ) : (
+                  <span className="flex-1 text-sm truncate"
+                    onDoubleClick={e => { e.stopPropagation(); setRenaming({ type: 'project', id: proj.id, value: proj.name }); }}>
+                    {proj.name}
+                  </span>
+                )}
+                <button title="삭제" onClick={e => { e.stopPropagation(); deleteIssueProject(proj.id); }}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/40 text-white/60 hover:text-white shrink-0">
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+          </nav>
+        )}
+
+        {/* ── TC 프로젝트 추가 ── */}
+        {view === 'tc' && <div className="px-3 pt-3 pb-6 border-t border-white/20">
           <p className="text-white/40 text-[10px] mb-1.5 uppercase tracking-wider">새 프로젝트</p>
           <div className="flex gap-1 w-full">
             <input value={newProjectName} onChange={e => setNewProjectName(e.target.value)}
@@ -471,7 +523,22 @@ export default function Home() {
               <Plus size={14} />
             </button>
           </div>
-        </div>
+        </div>}
+
+        {/* ── 이슈 프로젝트 추가 ── */}
+        {view === 'issue' && <div className="px-3 pt-3 pb-6 border-t border-white/20">
+          <p className="text-white/40 text-[10px] mb-1.5 uppercase tracking-wider">새 이슈 프로젝트</p>
+          <div className="flex gap-1 w-full">
+            <input value={newIssueProjectName} onChange={e => setNewIssueProjectName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addIssueProject()}
+              placeholder="이슈 프로젝트 이름"
+              className="min-w-0 flex-1 px-2 py-1 text-xs text-white bg-white/10 placeholder-white/40 rounded border border-white/20 focus:outline-none focus:border-white/50" />
+            <button onClick={addIssueProject}
+              className="w-8 h-7 flex items-center justify-center bg-white/20 rounded hover:bg-white/30 shrink-0">
+              <Plus size={14} />
+            </button>
+          </div>
+        </div>}
       </aside>
 
       {/* ── 메인 영역 ── */}
@@ -532,8 +599,8 @@ export default function Home() {
         {/* 이슈 뷰 */}
         {view === 'issue' && (
           <IssueView
-            projectId={selectedProjectId}
-            projectName={currentProject?.name ?? ''}
+            issueProjectId={selectedIssueProjectId}
+            projectName={issueProjects.find(p => p.id === selectedIssueProjectId)?.name ?? ''}
             onNavigateToTC={navigateToTC}
             jumpToIssueId={jumpToIssueId}
           />

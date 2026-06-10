@@ -107,8 +107,8 @@ function IssueScreenshotPanel({ issueId }: { issueId: number }) {
 }
 
 /* ── 연관 TC 패널 ── */
-function LinkedTCPanel({ issueId, projectId, onNavigateToTC }: {
-  issueId: number; projectId: number;
+function LinkedTCPanel({ issueId, onNavigateToTC }: {
+  issueId: number;
   onNavigateToTC: (moduleId: number, tcId: number) => void;
 }) {
   const [linked, setLinked] = useState<LinkedTC[]>([]);
@@ -117,9 +117,10 @@ function LinkedTCPanel({ issueId, projectId, onNavigateToTC }: {
   const [search, setSearch] = useState('');
 
   useEffect(() => { fetchLinked(); }, [issueId]);
+
+  // TC 프로젝트와 무관하게 전체 모듈/TC 로드
   useEffect(() => {
-    fetch(`/api/testcases?project_id_hint=${projectId}`)
-      .then(() => fetch(`/api/modules?project_id=${projectId}`))
+    fetch('/api/modules')
       .then(r => r.json())
       .then(async (mods: { id: number; name: string }[]) => {
         const all: TCOption[] = [];
@@ -130,7 +131,7 @@ function LinkedTCPanel({ issueId, projectId, onNavigateToTC }: {
         }
         setOptions(all);
       });
-  }, [projectId]);
+  }, []);
 
   async function fetchLinked() {
     const res = await fetch(`/api/issues/${issueId}/links`);
@@ -209,9 +210,9 @@ function LinkedTCPanel({ issueId, projectId, onNavigateToTC }: {
 
 /* ── 메인 IssueView ── */
 export default function IssueView({
-  projectId, projectName, onNavigateToTC, jumpToIssueId,
+  issueProjectId, projectName, onNavigateToTC, jumpToIssueId,
 }: {
-  projectId: number | null;
+  issueProjectId: number | null;
   projectName: string;
   onNavigateToTC: (moduleId: number, tcId: number) => void;
   jumpToIssueId?: number | null;
@@ -222,29 +223,27 @@ export default function IssueView({
   const [filterType, setFilterType]     = useState('');
   const [filterPriority, setFilterPriority] = useState('');
 
-  useEffect(() => { if (projectId) fetchIssues(); }, [projectId]);
+  useEffect(() => { if (issueProjectId) fetchIssues(); else setIssues([]); }, [issueProjectId]);
 
-  // 외부에서 특정 이슈로 점프 요청
   useEffect(() => {
     if (jumpToIssueId == null) return;
     setFilterStatus(''); setFilterType(''); setFilterPriority('');
     setExpandedId(jumpToIssueId);
-    // 렌더 후 해당 행으로 스크롤
     setTimeout(() => {
       document.getElementById(`issue-row-${jumpToIssueId}`)?.scrollIntoView({ behavior: 'instant', block: 'center' });
     }, 100);
   }, [jumpToIssueId]);
 
   async function fetchIssues() {
-    if (!projectId) return;
-    const res = await fetch(`/api/issues?project_id=${projectId}`);
+    if (!issueProjectId) return;
+    const res = await fetch(`/api/issues?issue_project_id=${issueProjectId}`);
     setIssues(await res.json());
   }
 
   async function addIssue() {
-    if (!projectId) return;
+    if (!issueProjectId) return;
     await fetch('/api/issues', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: projectId }) });
+      body: JSON.stringify({ issue_project_id: issueProjectId }) });
     fetchIssues();
   }
 
@@ -267,7 +266,7 @@ export default function IssueView({
     (!filterPriority || i.priority === filterPriority)
   );
 
-  if (!projectId) return (
+  if (!issueProjectId) return (
     <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
       <Link2 size={48} className="text-gray-200" />
       <p>왼쪽에서 프로젝트를 선택하세요</p>
@@ -382,7 +381,7 @@ export default function IssueView({
                             className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-mono resize-y focus:outline-none focus:ring-1 focus:ring-blue-400" />
                         </div>
                         {/* 연관 TC */}
-                        <LinkedTCPanel issueId={iss.id} projectId={projectId!} onNavigateToTC={onNavigateToTC} />
+                        <LinkedTCPanel issueId={iss.id} onNavigateToTC={onNavigateToTC} />
                         {/* 스크린샷 */}
                         <IssueScreenshotPanel issueId={iss.id} />
                       </div>
