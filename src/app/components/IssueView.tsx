@@ -9,7 +9,7 @@ type Issue = {
   linked_tc_count: number; screenshot_count: number; created_at: string;
 };
 type LinkedTC = { id: number; tc_id: string; category: string; sub_category: string; module_name: string; module_id: number };
-type Screenshot = { id: number; issue_id: number; filename: string };
+type Screenshot = { id: number; issue_id: number; filename: string; caption: string };
 type TCOption = { id: number; tc_id: string; category: string; module_name: string };
 
 /* ── 상수 ── */
@@ -37,7 +37,7 @@ const PRIORITY_COLOR: Record<string, string> = {
 function IssueScreenshotPanel({ issueId }: { issueId: number }) {
   const [shots, setShots] = useState<Screenshot[]>([]);
   const [dragging, setDragging] = useState(false);
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; caption: string } | null>(null);
 
   useEffect(() => { fetch(`/api/issue-screenshots?issue_id=${issueId}`).then(r => r.json()).then(setShots); }, [issueId]);
 
@@ -63,6 +63,11 @@ function IssueScreenshotPanel({ issueId }: { issueId: number }) {
     await fetch(`/api/issue-screenshots/${id}`, { method: 'DELETE' });
     setShots(prev => prev.filter(s => s.id !== id));
   }
+  async function updateCaption(id: number, caption: string) {
+    await fetch(`/api/issue-screenshots/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caption }) });
+    setShots(prev => prev.map(s => s.id === id ? { ...s, caption } : s));
+  }
 
   return (
     <>
@@ -85,21 +90,32 @@ function IssueScreenshotPanel({ issueId }: { issueId: number }) {
             ${dragging ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
           {shots.length === 0 && !dragging && <span className="text-xs text-gray-400 m-auto">이미지를 여기에 드롭하거나 Ctrl+V</span>}
           {shots.map(s => (
-            <div key={s.id} className="relative group">
-              <img src={`/screenshots/${s.filename}`} alt="" onClick={() => setLightbox(`/screenshots/${s.filename}`)}
-                className="h-20 w-auto rounded border border-gray-200 cursor-pointer hover:opacity-90 object-cover shadow-sm" />
-              <button onClick={() => del(s.id)}
-                className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <X size={10} />
-              </button>
+            <div key={s.id} className="relative group flex flex-col items-center gap-1">
+              <div className="relative">
+                <img src={`/screenshots/${s.filename}`} alt={s.caption || ''} onClick={() => setLightbox({ src: `/screenshots/${s.filename}`, caption: s.caption })}
+                  className="h-20 w-auto rounded border border-gray-200 cursor-pointer hover:opacity-90 object-cover shadow-sm" />
+                <button onClick={() => del(s.id)}
+                  className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <X size={10} />
+                </button>
+              </div>
+              <input
+                defaultValue={s.caption}
+                onBlur={e => { if (e.target.value !== s.caption) updateCaption(s.id, e.target.value); }}
+                placeholder="캡션 입력..."
+                className="w-24 text-[11px] text-center text-gray-500 border-0 border-b border-gray-200 bg-transparent focus:outline-none focus:border-blue-400 placeholder-gray-300 truncate"
+              />
             </div>
           ))}
         </div>
       </div>
       {lightbox && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center" onClick={() => setLightbox(null)}>
-          <img src={lightbox} alt="" className="max-w-[90vw] max-h-[90vh] rounded shadow-xl" />
-          <button className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 text-white rounded-full p-2"><X size={20} /></button>
+        <div className="fixed inset-0 bg-black/70 z-50 flex flex-col items-center justify-center gap-3" onClick={() => setLightbox(null)}>
+          <img src={lightbox.src} alt={lightbox.caption || ''} className="max-w-[90vw] max-h-[85vh] rounded shadow-xl" />
+          {lightbox.caption && (
+            <p className="text-white text-sm bg-black/40 px-4 py-1.5 rounded-full">{lightbox.caption}</p>
+          )}
+          <button onClick={() => setLightbox(null)} className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 text-white rounded-full p-2"><X size={20} /></button>
         </div>
       )}
     </>

@@ -130,6 +130,18 @@ function runMigrations(db: Database.Database) {
     db.prepare('UPDATE modules SET project_id = ? WHERE project_id IS NULL').run(proj.id);
   }
 
+  // screenshots.caption 컬럼 추가
+  const ssCols = (db.prepare('PRAGMA table_info(screenshots)').all() as { name: string }[]).map(c => c.name);
+  if (!ssCols.includes('caption')) {
+    db.exec(`ALTER TABLE screenshots ADD COLUMN caption TEXT NOT NULL DEFAULT ''`);
+  }
+
+  // issue_screenshots.caption 컬럼 추가
+  const issCols2 = (db.prepare('PRAGMA table_info(issue_screenshots)').all() as { name: string }[]).map(c => c.name);
+  if (!issCols2.includes('caption')) {
+    db.exec(`ALTER TABLE issue_screenshots ADD COLUMN caption TEXT NOT NULL DEFAULT ''`);
+  }
+
   // issues 테이블에 issue_project_id 컬럼 추가 (기존 DB 마이그레이션)
   const issCols = (db.prepare('PRAGMA table_info(issues)').all() as { name: string }[]).map(c => c.name);
   if (!issCols.includes('issue_project_id')) {
