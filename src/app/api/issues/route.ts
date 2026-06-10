@@ -24,9 +24,17 @@ export async function POST(req: Request) {
   const { issue_project_id, title } = await req.json();
   if (!issue_project_id) return NextResponse.json({ error: 'issue_project_id required' }, { status: 400 });
   const db = getDb();
-  const res = db.prepare(`
-    INSERT INTO issues (issue_project_id, issue_id, title) VALUES (?, 'ISS-000', ?)
-  `).run(issue_project_id, title ?? '새 이슈');
+  const cols = (db.prepare('PRAGMA table_info(issues)').all() as { name: string }[]).map(c => c.name);
+  let res;
+  if (cols.includes('project_id')) {
+    res = db.prepare(`
+      INSERT INTO issues (issue_project_id, project_id, issue_id, title) VALUES (?, 1, 'ISS-000', ?)
+    `).run(issue_project_id, title ?? '새 이슈');
+  } else {
+    res = db.prepare(`
+      INSERT INTO issues (issue_project_id, issue_id, title) VALUES (?, 'ISS-000', ?)
+    `).run(issue_project_id, title ?? '새 이슈');
+  }
   renumberIssues(issue_project_id);
   return NextResponse.json({ id: res.lastInsertRowid });
 }
