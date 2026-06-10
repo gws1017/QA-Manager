@@ -1,4 +1,4 @@
-import { getDb } from '@/lib/db';
+import { withDb } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 
@@ -10,13 +10,12 @@ const RESULT_COLORS: Record<string, string> = {
 };
 
 export async function GET() {
-  const db = getDb();
+  const r = await withDb(); if (r instanceof NextResponse) return r;
+  const { db } = r;
   const modules = db.prepare('SELECT * FROM modules ORDER BY id').all() as any[];
   const allTcs = db.prepare('SELECT * FROM test_cases ORDER BY module_id, tc_id').all() as any[];
 
   const wb = new ExcelJS.Workbook();
-
-  // 대시보드 시트
   const dash = wb.addWorksheet('대시보드');
   dash.columns = [
     { header: '모듈', key: 'module', width: 20 },
@@ -41,7 +40,6 @@ export async function GET() {
     if (fail > 0) row.getCell('fail').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCC' } };
   }
 
-  // 모듈별 시트
   for (const mod of modules) {
     const ws = wb.addWorksheet(mod.name);
     ws.columns = [
@@ -60,7 +58,6 @@ export async function GET() {
     hRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     hRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } };
     hRow.alignment = { vertical: 'middle', horizontal: 'center' };
-
     const tcs = allTcs.filter((t: any) => t.module_id === mod.id);
     tcs.forEach((tc: any) => {
       const row = ws.addRow(tc);
@@ -71,7 +68,6 @@ export async function GET() {
       });
       if (tc.result === 'Fail') row.font = { bold: true, color: { argb: 'FFCC0000' } };
     });
-
     ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 1, topLeftCell: 'A2' }];
   }
 

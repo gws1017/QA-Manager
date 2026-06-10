@@ -1,10 +1,12 @@
-import { getDb, renumberIssues } from '@/lib/db';
+import { withDb } from '@/lib/auth';
+import { renumberIssues } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
+  const r = await withDb(); if (r instanceof NextResponse) return r;
+  const { db } = r;
   const { searchParams } = new URL(req.url);
   const issueProjectId = searchParams.get('issue_project_id');
-  const db = getDb();
   const sql = `
     SELECT i.*,
       COUNT(DISTINCT l.id) as linked_tc_count,
@@ -16,17 +18,22 @@ export async function GET(req: Request) {
     GROUP BY i.id
     ORDER BY i.id ASC
   `;
-  const rows = issueProjectId ? db.prepare(sql).all(issueProjectId) : db.prepare(sql).all();
-  return NextResponse.json(rows);
+  return NextResponse.json(issueProjectId ? db.prepare(sql).all(issueProjectId) : db.prepare(sql).all());
 }
 
 export async function POST(req: Request) {
+  const r = await withDb(); if (r instanceof NextResponse) return r;
+  const { db } = r;
   const { issue_project_id, title } = await req.json();
   if (!issue_project_id) return NextResponse.json({ error: 'issue_project_id required' }, { status: 400 });
-  const db = getDb();
-  const res = db.prepare(`
-    INSERT INTO issues (issue_project_id, issue_id, title) VALUES (?, 'ISS-000', ?)
-  `).run(issue_project_id, title ?? '새 이슈');
-  renumberIssues(issue_project_id);
+  const cols = (db.prepare('PRAGMA table_info(issues)').all() as { name: string }[]).map(c => c.name);
+  const hasLegacy = cols.includes('project_id');
+  let res;
+  if (hasLegacy) {
+    res = db.prepare(`INSERT INTO issues (issue_project_id, project_id, issue_id, title) VALUES (?, 1, 'ISS-000', ?)`).run(issue_project_id, title ?? '새 이슈');
+  } else {
+    res = db.prepare(`INSERT INTO issues (issue_project_id, issue_id, title) VALUES (?, 'ISS-000', ?)`).run(issue_project_id, title ?? '새 이슈');
+  }
+  renumberIssues(db, issue_project_id);
   return NextResponse.json({ id: res.lastInsertRowid });
 }

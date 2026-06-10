@@ -3,8 +3,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Download, Upload, Plus, Trash2, ChevronDown, ChevronUp,
   CheckSquare, Square, Paperclip, X, ImageIcon, Copy,
-  FolderOpen, Folder, ChevronRight, ClipboardList, Bug,
+  FolderOpen, Folder, ChevronRight, ClipboardList, Bug, LogOut,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import IssueView from './components/IssueView';
 
 type Project = { id: number; name: string; description: string };
@@ -134,8 +135,8 @@ function ScreenshotPanel({ tcId }: { tcId: number }) {
           {shots.map(s => (
             <div key={s.id} className="relative group flex flex-col items-center gap-1">
               <div className="relative">
-                <img src={`/screenshots/${s.filename}`} alt={s.caption || 'screenshot'}
-                  onClick={() => setLightbox({ src: `/screenshots/${s.filename}`, caption: s.caption })}
+                <img src={`/api/img/${s.filename}`} alt={s.caption || 'screenshot'}
+                  onClick={() => setLightbox({ src: `/api/img/${s.filename}`, caption: s.caption })}
                   className="h-24 w-auto rounded border border-gray-200 cursor-pointer hover:opacity-90 object-cover shadow-sm" />
                 <button onClick={() => deleteShot(s.id)}
                   className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -167,6 +168,8 @@ function ScreenshotPanel({ tcId }: { tcId: number }) {
 
 /* ───────── 메인 ───────── */
 export default function Home() {
+  const router = useRouter();
+  const [userId, setUserId] = useState('');
   const [projects, setProjects]           = useState<Project[]>([]);       // TC 전용
   const [issueProjects, setIssueProjects] = useState<Project[]>([]);       // 이슈 전용
   const [modules, setModules]             = useState<Module[]>([]);
@@ -180,6 +183,7 @@ export default function Home() {
   const [importing, setImporting]         = useState(false);
   const [selected, setSelected]           = useState<Set<number>>(new Set());
   const [filterResult, setFilterResult]   = useState<string>('');
+  const [moveTargetModule, setMoveTargetModule] = useState<string>('');
   const [jumpToIssueId, setJumpToIssueId] = useState<number | null>(null);
   const scrollTargetTC = useRef<number | null>(null);
 
@@ -191,7 +195,16 @@ export default function Home() {
   // 이름 변경 상태  { type: 'project'|'module', id, value }
   const [renaming, setRenaming] = useState<{ type: 'project' | 'module'; id: number; value: string } | null>(null);
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    fetchAll();
+    fetch('/api/auth/me').then(r => r.json()).then(d => { if (d.userId) setUserId(d.userId); });
+  }, []);
+
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/login');
+    router.refresh();
+  }
   useEffect(() => {
     if (selectedModule) {
       // 네비게이션으로 온 경우엔 expandedId 초기화 안 함
@@ -355,10 +368,20 @@ export default function Home() {
       body: JSON.stringify({ [field]: value }) });
     setTcs(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
   }
-  async function bulkAction(action: 'delete' | 'result', result?: string) {
+  async function bulkAction(action: 'delete' | 'result' | 'move', result?: string) {
     const ids = Array.from(selected);
     if (!ids.length) return;
     if (action === 'delete' && !confirm(`${ids.length}건을 삭제할까요?`)) return;
+    if (action === 'move') {
+      if (!moveTargetModule) return;
+      if (!confirm(`${ids.length}건을 선택한 탭으로 이동할까요?`)) return;
+      await fetch('/api/testcases/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, action: 'move', target_module_id: Number(moveTargetModule) }) });
+      setSelected(new Set());
+      setMoveTargetModule('');
+      if (selectedModule) fetchTCs(selectedModule);
+      return;
+    }
     await fetch('/api/testcases/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids, action, result }) });
     setSelected(new Set());
@@ -404,8 +427,14 @@ export default function Home() {
 
       {/* ── 사이드바 ── */}
       <aside className="w-60 bg-[#1f3864] text-white flex flex-col shrink-0">
-        <div className="px-4 py-4 text-base font-bold border-b border-white/20 tracking-wide">
-          QA Manager
+        <div className="px-4 py-3 border-b border-white/20 flex items-center justify-between">
+          <span className="text-base font-bold tracking-wide">QA Manager</span>
+          <div className="flex items-center gap-2">
+            {userId && <span className="text-xs text-white/60 truncate max-w-[80px]">{userId}</span>}
+            <button onClick={logout} title="로그아웃" className="p-1 rounded hover:bg-white/20 text-white/60 hover:text-white">
+              <LogOut size={14} />
+            </button>
+          </div>
         </div>
         {/* 뷰 전환 탭 */}
         <div className="flex border-b border-white/20 shrink-0">
@@ -627,6 +656,23 @@ export default function Home() {
             <button onClick={() => bulkAction('delete')}
               className="flex items-center gap-1 px-2.5 py-1 rounded text-xs bg-red-100 text-red-700 hover:bg-red-200 font-medium">
               <Trash2 size={12} /> 일괄 삭제
+            </button>
+            <span className="text-gray-300">|</span>
+            <span className="text-xs text-gray-500">탭 이동:</span>
+            <select value={moveTargetModule} onChange={e => setMoveTargetModule(e.target.value)}
+              className="text-xs border border-blue-300 rounded px-2 py-1 focus:outline-none bg-white max-w-[200px]">
+              <option value="">— 이동할 탭 선택 —</option>
+              {projects.map(proj => (
+                <optgroup key={proj.id} label={proj.name}>
+                  {modules.filter(m => m.project_id === proj.id && m.id !== selectedModule).map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <button onClick={() => bulkAction('move')} disabled={!moveTargetModule}
+              className="flex items-center gap-1 px-2.5 py-1 rounded text-xs bg-blue-500 text-white hover:bg-blue-600 font-medium disabled:opacity-40 disabled:cursor-not-allowed">
+              이동
             </button>
             <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-gray-400 hover:text-gray-600">선택 해제</button>
           </div>

@@ -92,7 +92,7 @@ function IssueScreenshotPanel({ issueId }: { issueId: number }) {
           {shots.map(s => (
             <div key={s.id} className="relative group flex flex-col items-center gap-1">
               <div className="relative">
-                <img src={`/screenshots/${s.filename}`} alt={s.caption || ''} onClick={() => setLightbox({ src: `/screenshots/${s.filename}`, caption: s.caption })}
+                <img src={`/api/img/${s.filename}`} alt={s.caption || ''} onClick={() => setLightbox({ src: `/api/img/${s.filename}`, caption: s.caption })}
                   className="h-20 w-auto rounded border border-gray-200 cursor-pointer hover:opacity-90 object-cover shadow-sm" />
                 <button onClick={() => del(s.id)}
                   className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

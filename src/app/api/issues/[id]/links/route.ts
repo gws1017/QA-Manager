@@ -1,9 +1,10 @@
-import { getDb } from '@/lib/db';
+import { withDb } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const r = await withDb(); if (r instanceof NextResponse) return r;
   const { id } = await params;
-  const rows = getDb().prepare(`
+  const rows = r.db.prepare(`
     SELECT tc.id, tc.tc_id, tc.category, tc.sub_category, tc.module_id,
            m.name as module_name
     FROM issue_tc_links l
@@ -16,17 +17,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const r = await withDb(); if (r instanceof NextResponse) return r;
   const { id } = await params;
   const { test_case_id } = await req.json();
   try {
-    getDb().prepare('INSERT INTO issue_tc_links (issue_id, test_case_id) VALUES (?,?)').run(id, test_case_id);
+    r.db.prepare('INSERT INTO issue_tc_links (issue_id, test_case_id) VALUES (?,?)').run(id, test_case_id);
   } catch { /* UNIQUE 중복 무시 */ }
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const r = await withDb(); if (r instanceof NextResponse) return r;
   const { id } = await params;
   const { test_case_id } = await req.json();
-  getDb().prepare('DELETE FROM issue_tc_links WHERE issue_id=? AND test_case_id=?').run(id, test_case_id);
+  r.db.prepare('DELETE FROM issue_tc_links WHERE issue_id=? AND test_case_id=?').run(id, test_case_id);
   return NextResponse.json({ ok: true });
 }
