@@ -556,9 +556,6 @@ export default function Home() {
           <span className="text-base font-bold tracking-wide">QA Manager</span>
           <div className="flex items-center gap-2">
             {userId && <span className="text-xs text-white/60 truncate max-w-[80px]">{userId}</span>}
-            <button onClick={() => setShowHelp(true)} title="사용 가이드" className="p-1 rounded hover:bg-white/20 text-white/60 hover:text-white">
-              <HelpCircle size={16} />
-            </button>
             <button onClick={logout} title="로그아웃" className="p-1 rounded hover:bg-white/20 text-white/60 hover:text-white">
               <LogOut size={14} />
             </button>
@@ -685,6 +682,14 @@ export default function Home() {
             ))}
           </nav>
         )}
+
+        {/* ── 도움말 버튼 ── */}
+        <div className="px-3 py-2 border-t border-white/20">
+          <button onClick={() => setShowHelp(true)}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs text-white/50 hover:text-white hover:bg-white/10 transition-colors">
+            <HelpCircle size={13} /> 사용 가이드
+          </button>
+        </div>
 
         {/* ── TC 프로젝트 추가 ── */}
         {view === 'tc' && <div className="px-3 pt-3 pb-6 border-t border-white/20">
