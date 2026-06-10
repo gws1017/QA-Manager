@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, ChevronDown, ChevronUp, X, ImageIcon, Paperclip, Link2, Link2Off } from 'lucide-react';
+import { Plus, Trash2, Copy, ChevronDown, ChevronUp, X, ImageIcon, Paperclip, Link2, Link2Off } from 'lucide-react';
 
 /* ── 타입 ── */
 type Issue = {
@@ -8,7 +8,7 @@ type Issue = {
   type: string; status: string; priority: string; description: string;
   linked_tc_count: number; screenshot_count: number; created_at: string;
 };
-type LinkedTC = { id: number; tc_id: string; category: string; sub_category: string; module_name: string };
+type LinkedTC = { id: number; tc_id: string; category: string; sub_category: string; module_name: string; module_id: number };
 type Screenshot = { id: number; issue_id: number; filename: string };
 type TCOption = { id: number; tc_id: string; category: string; module_name: string };
 
@@ -222,8 +222,14 @@ export default function IssueView({
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType]     = useState('');
   const [filterPriority, setFilterPriority] = useState('');
+  const [allIssueProjects, setAllIssueProjects] = useState<{ id: number; name: string }[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [moveTargetId, setMoveTargetId] = useState<string>('');
 
   useEffect(() => { if (issueProjectId) fetchIssues(); else setIssues([]); }, [issueProjectId]);
+  useEffect(() => {
+    fetch('/api/issue-projects').then(r => r.json()).then(setAllIssueProjects);
+  }, []);
 
   useEffect(() => {
     if (jumpToIssueId == null) return;
@@ -244,6 +250,49 @@ export default function IssueView({
     if (!issueProjectId) return;
     await fetch('/api/issues', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ issue_project_id: issueProjectId }) });
+    fetchIssues();
+  }
+
+  async function moveIssue(id: number, targetProjectId: number) {
+    await fetch(`/api/issues/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ issue_project_id: targetProjectId }) });
+    setExpandedId(null);
+    fetchIssues();
+  }
+
+  async function deleteSelected() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`선택한 ${selectedIds.size}개 이슈를 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
+    await Promise.all([...selectedIds].map(id =>
+      fetch(`/api/issues/${id}`, { method: 'DELETE' })
+    ));
+    setSelectedIds(new Set());
+    if (selectedIds.has(expandedId!)) setExpandedId(null);
+    fetchIssues();
+  }
+
+  async function moveSelected() {
+    if (!moveTargetId || selectedIds.size === 0) return;
+    if (!confirm(`선택한 ${selectedIds.size}개 이슈를 이동할까요?`)) return;
+    await Promise.all([...selectedIds].map(id =>
+      fetch(`/api/issues/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issue_project_id: Number(moveTargetId) }) })
+    ));
+    setSelectedIds(new Set());
+    setMoveTargetId('');
+    setExpandedId(null);
+    fetchIssues();
+  }
+
+  function toggleSelect(id: number) {
+    setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  }
+  function toggleSelectAll() {
+    setSelectedIds(prev => prev.size === displayed.length ? new Set() : new Set(displayed.map(i => i.id)));
+  }
+
+  async function cloneIssue(id: number) {
+    await fetch(`/api/issues/${id}`, { method: 'POST' });
     fetchIssues();
   }
 
@@ -291,10 +340,38 @@ export default function IssueView({
           </select>
         ))}
         <span className="text-xs text-gray-400 ml-1">{displayed.length}건</span>
-        <button onClick={addIssue}
-          className="ml-auto flex items-center gap-1 px-3 py-1.5 bg-[#1f3864] text-white rounded hover:bg-[#2a4f8a] text-xs">
-          <Plus size={13} /> 이슈 추가
-        </button>
+
+        {/* 일괄 이동 영역 */}
+        <div className="ml-auto flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <>
+              <span className="text-xs text-orange-600 font-medium">{selectedIds.size}개 선택</span>
+              <select value={moveTargetId} onChange={e => setMoveTargetId(e.target.value)}
+                className="text-xs border border-orange-300 rounded px-2 py-1 focus:outline-none bg-orange-50">
+                <option value="">— 이동할 프로젝트 —</option>
+                {allIssueProjects.filter(p => p.id !== issueProjectId).map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <button onClick={moveSelected} disabled={!moveTargetId}
+                className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white rounded hover:bg-orange-600 text-xs disabled:opacity-40 disabled:cursor-not-allowed">
+                이동
+              </button>
+              <button onClick={deleteSelected}
+                className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-xs">
+                <Trash2 size={13} /> 삭제
+              </button>
+              <button onClick={() => setSelectedIds(new Set())}
+                className="flex items-center gap-1 px-2 py-1.5 text-gray-400 hover:text-gray-600 text-xs">
+                <X size={13} />
+              </button>
+            </>
+          )}
+          <button onClick={addIssue}
+            className="flex items-center gap-1 px-3 py-1.5 bg-[#1f3864] text-white rounded hover:bg-[#2a4f8a] text-xs">
+            <Plus size={13} /> 이슈 추가
+          </button>
+        </div>
       </div>
 
       {/* 이슈 테이블 */}
@@ -302,6 +379,12 @@ export default function IssueView({
         <table className="w-full border-collapse text-xs">
           <thead className="sticky top-0 bg-[#1f3864] text-white z-10">
             <tr>
+              <th className="px-3 py-2 border-r border-white/10 w-8">
+                <input type="checkbox"
+                  checked={displayed.length > 0 && selectedIds.size === displayed.length}
+                  onChange={toggleSelectAll}
+                  className="cursor-pointer accent-orange-400" />
+              </th>
               {['ID','제목','유형','상태','우선순위','TC','📎','날짜',''].map((h, i) => (
                 <th key={i} className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-white/10 last:border-0">{h}</th>
               ))}
@@ -313,8 +396,12 @@ export default function IssueView({
                 <tr id={`issue-row-${iss.id}`}
                   className={`border-b border-gray-200 hover:bg-gray-50 cursor-pointer
                   ${iss.status === 'Closed' ? 'opacity-60' : ''}
-                  ${expandedId === iss.id ? 'bg-blue-50/30' : ''}`}
+                  ${selectedIds.has(iss.id) ? 'bg-orange-50' : expandedId === iss.id ? 'bg-blue-50/30' : ''}`}
                   onClick={() => setExpandedId(expandedId === iss.id ? null : iss.id)}>
+                  <td className="px-3 py-2 w-8" onClick={e => { e.stopPropagation(); toggleSelect(iss.id); }}>
+                    <input type="checkbox" checked={selectedIds.has(iss.id)} onChange={() => {}}
+                      className="cursor-pointer accent-orange-400" />
+                  </td>
                   <td className="px-3 py-2 font-mono font-semibold text-gray-500 whitespace-nowrap">{iss.issue_id}</td>
                   <td className="px-3 py-2 font-medium text-gray-800 max-w-xs truncate" title={iss.title}>{iss.title || <span className="text-gray-400 italic">제목 없음</span>}</td>
                   <td className="px-3 py-2 whitespace-nowrap">
@@ -339,7 +426,8 @@ export default function IssueView({
                   <td className="px-3 py-2 text-gray-400 whitespace-nowrap">{iss.created_at?.slice(5, 10)}</td>
                   <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => deleteIssue(iss.id)} className="p-1 rounded hover:bg-red-100 text-red-300 hover:text-red-600"><Trash2 size={13} /></button>
+                      <button onClick={() => cloneIssue(iss.id)} className="p-1 rounded hover:bg-blue-100 text-gray-300 hover:text-blue-500" title="복제"><Copy size={13} /></button>
+                      <button onClick={() => deleteIssue(iss.id)} className="p-1 rounded hover:bg-red-100 text-red-300 hover:text-red-600" title="삭제"><Trash2 size={13} /></button>
                       {expandedId === iss.id ? <ChevronUp size={13} className="text-gray-400" /> : <ChevronDown size={13} className="text-gray-400" />}
                     </div>
                   </td>
@@ -347,7 +435,7 @@ export default function IssueView({
 
                 {expandedId === iss.id && (
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <td colSpan={9} className="px-8 py-5">
+                    <td colSpan={10} className="px-8 py-5">
                       <div className="max-w-3xl space-y-4">
                         {/* 제목 */}
                         <div>
@@ -391,7 +479,7 @@ export default function IssueView({
               </React.Fragment>
             ))}
             {displayed.length === 0 && (
-              <tr><td colSpan={9} className="text-center py-20 text-gray-400">
+              <tr><td colSpan={10} className="text-center py-20 text-gray-400">
                 {issues.length === 0 ? '이슈가 없습니다. 이슈 추가 버튼을 눌러주세요.' : '필터 조건에 맞는 이슈가 없습니다.'}
               </td></tr>
             )}

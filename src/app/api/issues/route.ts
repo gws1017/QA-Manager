@@ -14,7 +14,7 @@ export async function GET(req: Request) {
     LEFT JOIN issue_screenshots s ON s.issue_id = i.id
     ${issueProjectId ? 'WHERE i.issue_project_id = ?' : ''}
     GROUP BY i.id
-    ORDER BY i.id DESC
+    ORDER BY i.id ASC
   `;
   const rows = issueProjectId ? db.prepare(sql).all(issueProjectId) : db.prepare(sql).all();
   return NextResponse.json(rows);
