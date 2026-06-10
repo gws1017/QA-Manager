@@ -107,7 +107,10 @@ function IssueScreenshotPanel({ issueId }: { issueId: number }) {
 }
 
 /* ── 연관 TC 패널 ── */
-function LinkedTCPanel({ issueId, projectId }: { issueId: number; projectId: number }) {
+function LinkedTCPanel({ issueId, projectId, onNavigateToTC }: {
+  issueId: number; projectId: number;
+  onNavigateToTC: (moduleId: number, tcId: number) => void;
+}) {
   const [linked, setLinked] = useState<LinkedTC[]>([]);
   const [options, setOptions] = useState<TCOption[]>([]);
   const [showPicker, setShowPicker] = useState(false);
@@ -166,9 +169,14 @@ function LinkedTCPanel({ issueId, projectId }: { issueId: number; projectId: num
         {linked.length === 0 && <span className="text-xs text-gray-400">연결된 TC 없음</span>}
         {linked.map(tc => (
           <span key={tc.id} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-            <span className="font-mono font-semibold">{tc.tc_id}</span>
-            {tc.category && <span className="text-blue-400">· {tc.category}</span>}
-            <span className="text-blue-300 text-[10px]">[{tc.module_name}]</span>
+            <button
+              onClick={() => onNavigateToTC(tc.module_id, tc.id)}
+              className="flex items-center gap-1 hover:underline cursor-pointer"
+              title="해당 TC로 이동">
+              <span className="font-mono font-semibold">{tc.tc_id}</span>
+              {tc.category && <span className="text-blue-400">· {tc.category}</span>}
+              <span className="text-blue-300 text-[10px]">[{tc.module_name}]</span>
+            </button>
             <button onClick={() => unlink(tc.id)} className="ml-0.5 hover:text-red-500"><X size={10} /></button>
           </span>
         ))}
@@ -200,7 +208,14 @@ function LinkedTCPanel({ issueId, projectId }: { issueId: number; projectId: num
 }
 
 /* ── 메인 IssueView ── */
-export default function IssueView({ projectId, projectName }: { projectId: number | null; projectName: string }) {
+export default function IssueView({
+  projectId, projectName, onNavigateToTC, jumpToIssueId,
+}: {
+  projectId: number | null;
+  projectName: string;
+  onNavigateToTC: (moduleId: number, tcId: number) => void;
+  jumpToIssueId?: number | null;
+}) {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState('');
@@ -208,6 +223,17 @@ export default function IssueView({ projectId, projectName }: { projectId: numbe
   const [filterPriority, setFilterPriority] = useState('');
 
   useEffect(() => { if (projectId) fetchIssues(); }, [projectId]);
+
+  // 외부에서 특정 이슈로 점프 요청
+  useEffect(() => {
+    if (jumpToIssueId == null) return;
+    setFilterStatus(''); setFilterType(''); setFilterPriority('');
+    setExpandedId(jumpToIssueId);
+    // 렌더 후 해당 행으로 스크롤
+    setTimeout(() => {
+      document.getElementById(`issue-row-${jumpToIssueId}`)?.scrollIntoView({ behavior: 'instant', block: 'center' });
+    }, 100);
+  }, [jumpToIssueId]);
 
   async function fetchIssues() {
     if (!projectId) return;
@@ -285,8 +311,10 @@ export default function IssueView({ projectId, projectName }: { projectId: numbe
           <tbody>
             {displayed.map(iss => (
               <React.Fragment key={iss.id}>
-                <tr className={`border-b border-gray-200 hover:bg-gray-50 cursor-pointer
-                  ${iss.status === 'Closed' ? 'opacity-60' : ''}`}
+                <tr id={`issue-row-${iss.id}`}
+                  className={`border-b border-gray-200 hover:bg-gray-50 cursor-pointer
+                  ${iss.status === 'Closed' ? 'opacity-60' : ''}
+                  ${expandedId === iss.id ? 'bg-blue-50/30' : ''}`}
                   onClick={() => setExpandedId(expandedId === iss.id ? null : iss.id)}>
                   <td className="px-3 py-2 font-mono font-semibold text-gray-500 whitespace-nowrap">{iss.issue_id}</td>
                   <td className="px-3 py-2 font-medium text-gray-800 max-w-xs truncate" title={iss.title}>{iss.title || <span className="text-gray-400 italic">제목 없음</span>}</td>
@@ -354,7 +382,7 @@ export default function IssueView({ projectId, projectName }: { projectId: numbe
                             className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-mono resize-y focus:outline-none focus:ring-1 focus:ring-blue-400" />
                         </div>
                         {/* 연관 TC */}
-                        <LinkedTCPanel issueId={iss.id} projectId={projectId!} />
+                        <LinkedTCPanel issueId={iss.id} projectId={projectId!} onNavigateToTC={onNavigateToTC} />
                         {/* 스크린샷 */}
                         <IssueScreenshotPanel issueId={iss.id} />
                       </div>

@@ -29,6 +29,47 @@ const ROW_STYLE: Record<string, string> = {
   Pass: 'bg-green-50', Fail: 'bg-red-50', 'N/A': 'bg-yellow-50', 'No Run': '',
 };
 
+/* ───────── TC에 연결된 이슈 패널 ───────── */
+type LinkedIssue = { id: number; issue_id: string; title: string; status: string; priority: string; type: string; project_id: number };
+const STATUS_STYLE_MINI: Record<string, string> = {
+  'Open': 'bg-gray-100 text-gray-600', 'In Progress': 'bg-blue-100 text-blue-700',
+  'Resolved': 'bg-green-100 text-green-700', 'Closed': 'bg-gray-200 text-gray-500',
+};
+const PRIORITY_DOT: Record<string, string> = { Critical: 'text-red-500', High: 'text-orange-400', Medium: 'text-yellow-400', Low: 'text-blue-300' };
+
+function LinkedIssuesPanel({ tcId, onNavigateToIssue }: {
+  tcId: number;
+  onNavigateToIssue: (projectId: number, issueId: number) => void;
+}) {
+  const [issues, setIssues] = useState<LinkedIssue[]>([]);
+  useEffect(() => {
+    fetch(`/api/testcases/${tcId}/issues`).then(r => r.json()).then(setIssues);
+  }, [tcId]);
+
+  if (issues.length === 0) return null;
+
+  return (
+    <div className="col-span-2 border-t border-gray-100 pt-4 mt-2">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs font-medium text-gray-500">🔗 연관 이슈</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {issues.map(iss => (
+          <button key={iss.id}
+            onClick={() => onNavigateToIssue(iss.project_id, iss.id)}
+            className="inline-flex items-center gap-1.5 px-2 py-1 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700 hover:bg-orange-100 transition-colors"
+            title="해당 이슈로 이동">
+            <span className={`font-bold text-[10px] ${PRIORITY_DOT[iss.priority]}`}>●</span>
+            <span className="font-mono font-semibold">{iss.issue_id}</span>
+            <span className="text-orange-600 max-w-[160px] truncate">{iss.title}</span>
+            <span className={`px-1 py-0.5 rounded text-[10px] ${STATUS_STYLE_MINI[iss.status]}`}>{iss.status}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ───────── 스크린샷 패널 ───────── */
 function ScreenshotPanel({ tcId }: { tcId: number }) {
   const [shots, setShots] = useState<Screenshot[]>([]);
@@ -120,6 +161,8 @@ export default function Home() {
   const [expandedId, setExpandedId]       = useState<number | null>(null);
   const [importing, setImporting]         = useState(false);
   const [selected, setSelected]           = useState<Set<number>>(new Set());
+  const [jumpToIssueId, setJumpToIssueId] = useState<number | null>(null);
+  const scrollTargetTC = useRef<number | null>(null);
 
   // 추가 입력 상태
   const [newProjectName, setNewProjectName] = useState('');
@@ -130,7 +173,28 @@ export default function Home() {
   const [renaming, setRenaming] = useState<{ type: 'project' | 'module'; id: number; value: string } | null>(null);
 
   useEffect(() => { fetchAll(); }, []);
-  useEffect(() => { if (selectedModule) { fetchTCs(selectedModule); setSelected(new Set()); setExpandedId(null); } }, [selectedModule]);
+  useEffect(() => {
+    if (selectedModule) {
+      // 네비게이션으로 온 경우엔 expandedId 초기화 안 함
+      if (scrollTargetTC.current === null) setExpandedId(null);
+      setSelected(new Set());
+      fetchTCs(selectedModule);
+    }
+  }, [selectedModule]);
+
+  // tcs가 렌더된 후 스크롤 타겟 처리
+  useEffect(() => {
+    const target = scrollTargetTC.current;
+    if (target == null) return;
+    // 다음 paint 후 스크롤
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`tc-row-${target}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'instant', block: 'center' });
+        scrollTargetTC.current = null;
+      }
+    });
+  }, [tcs]);
 
   async function fetchAll() {
     const [pRes, mRes] = await Promise.all([fetch('/api/projects'), fetch('/api/modules')]);
@@ -195,6 +259,33 @@ export default function Home() {
     await fetch(`/api/modules/${id}`, { method: 'DELETE' });
     if (selectedModule === id) { setSelectedModule(null); setTcs([]); }
     fetchAll();
+  }
+
+  /* 뷰 간 네비게이션 */
+  function navigateToTC(moduleId: number, tcId: number) {
+    const mod = modules.find(m => m.id === moduleId);
+    if (mod) setSelectedProjectId(mod.project_id);
+    setExpandedId(tcId);
+    setView('tc');
+
+    if (selectedModule === moduleId) {
+      // 이미 같은 모듈 선택 중 → useEffect 트리거 안 됨 → 직접 스크롤
+      requestAnimationFrame(() => {
+        document.getElementById(`tc-row-${tcId}`)?.scrollIntoView({ behavior: 'instant', block: 'center' });
+      });
+    } else {
+      // 다른 모듈 → fetchTCs 후 tcs 변경 시 useEffect에서 스크롤
+      scrollTargetTC.current = tcId;
+      setSelectedModule(moduleId);
+    }
+  }
+
+  function navigateToIssue(projectId: number, issueId: number) {
+    setSelectedProjectId(projectId);
+    setJumpToIssueId(issueId);
+    setView('issue');
+    // 다음 렌더 후 초기화 (한 번만 점프)
+    setTimeout(() => setJumpToIssueId(null), 500);
   }
 
   /* TC */
@@ -443,6 +534,8 @@ export default function Home() {
           <IssueView
             projectId={selectedProjectId}
             projectName={currentProject?.name ?? ''}
+            onNavigateToTC={navigateToTC}
+            jumpToIssueId={jumpToIssueId}
           />
         )}
 
@@ -471,6 +564,7 @@ export default function Home() {
                 {tcs.map(tc => (
                   <React.Fragment key={tc.id}>
                     <tr
+                      id={`tc-row-${tc.id}`}
                       className={`border-b border-gray-200 hover:brightness-95 cursor-pointer ${selected.has(tc.id) ? 'ring-2 ring-inset ring-blue-400' : ''} ${ROW_STYLE[tc.result] ?? ''}`}
                       onClick={() => setExpandedId(expandedId === tc.id ? null : tc.id)}>
                       <td className="px-3 py-2" onClick={e => { e.stopPropagation(); toggleSelect(tc.id); }}>
@@ -527,6 +621,7 @@ export default function Home() {
                                   className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs resize-none focus:outline-none focus:ring-1 focus:ring-blue-400" />
                               </div>
                             ))}
+                            <LinkedIssuesPanel tcId={tc.id} onNavigateToIssue={navigateToIssue} />
                             <ScreenshotPanel tcId={tc.id} />
                           </div>
                         </td>
