@@ -179,6 +179,7 @@ export default function Home() {
   const [expandedId, setExpandedId]       = useState<number | null>(null);
   const [importing, setImporting]         = useState(false);
   const [selected, setSelected]           = useState<Set<number>>(new Set());
+  const [filterResult, setFilterResult]   = useState<string>('');
   const [jumpToIssueId, setJumpToIssueId] = useState<number | null>(null);
   const scrollTargetTC = useRef<number | null>(null);
 
@@ -196,6 +197,7 @@ export default function Home() {
       // 네비게이션으로 온 경우엔 expandedId 초기화 안 함
       if (scrollTargetTC.current === null) setExpandedId(null);
       setSelected(new Set());
+      setFilterResult('');
       fetchTCs(selectedModule);
     }
   }, [selectedModule]);
@@ -393,6 +395,7 @@ export default function Home() {
     fail:  tcs.filter(t => t.result === 'Fail').length,
     norun: tcs.filter(t => t.result === 'No Run').length,
   };
+  const displayedTcs = filterResult ? tcs.filter(t => t.result === filterResult) : tcs;
   const currentModule  = modules.find(m => m.id === selectedModule);
   const currentProject = projects.find(p => p.id === currentModule?.project_id);
 
@@ -567,13 +570,30 @@ export default function Home() {
             {currentProject && <ChevronRight size={13} className="text-gray-300" />}
             <h1 className="font-bold text-gray-800">{currentModule?.name ?? '탭을 선택하세요'}</h1>
             <div className="flex gap-2 text-xs ml-3">
-              <span className="px-2 py-1 rounded bg-gray-100">전체 {stats.total}</span>
-              <span className="px-2 py-1 rounded bg-green-100 text-green-700">Pass {stats.pass}</span>
-              <span className="px-2 py-1 rounded bg-red-100 text-red-700 font-bold">Fail {stats.fail}</span>
-              <span className="px-2 py-1 rounded bg-gray-100 text-gray-500">No Run {stats.norun}</span>
+              <button onClick={() => setFilterResult('')}
+                className={`px-2 py-1 rounded transition-all ${filterResult === '' ? 'bg-gray-400 text-white font-bold ring-2 ring-gray-400 ring-offset-1' : 'bg-gray-100 hover:bg-gray-200'}`}>
+                전체 {stats.total}
+              </button>
+              <button onClick={() => setFilterResult(filterResult === 'Pass' ? '' : 'Pass')}
+                className={`px-2 py-1 rounded transition-all ${filterResult === 'Pass' ? 'bg-green-500 text-white font-bold ring-2 ring-green-400 ring-offset-1' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
+                Pass {stats.pass}
+              </button>
+              <button onClick={() => setFilterResult(filterResult === 'Fail' ? '' : 'Fail')}
+                className={`px-2 py-1 rounded transition-all ${filterResult === 'Fail' ? 'bg-red-500 text-white font-bold ring-2 ring-red-400 ring-offset-1' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}>
+                Fail {stats.fail}
+              </button>
+              <button onClick={() => setFilterResult(filterResult === 'No Run' ? '' : 'No Run')}
+                className={`px-2 py-1 rounded transition-all ${filterResult === 'No Run' ? 'bg-gray-500 text-white font-bold ring-2 ring-gray-400 ring-offset-1' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                No Run {stats.norun}
+              </button>
               {stats.total > 0 && (
                 <span className="px-2 py-1 rounded bg-blue-100 text-blue-700">
                   진행률 {Math.round(stats.pass / stats.total * 100)}%
+                </span>
+              )}
+              {filterResult && (
+                <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-700 font-medium">
+                  {displayedTcs.length}건 표시중
                 </span>
               )}
             </div>
@@ -644,7 +664,7 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {tcs.map(tc => (
+                {displayedTcs.map(tc => (
                   <React.Fragment key={tc.id}>
                     <tr
                       id={`tc-row-${tc.id}`}
@@ -715,6 +735,12 @@ export default function Home() {
                 {tcs.length === 0 && (
                   <tr><td colSpan={11} className="text-center py-20 text-gray-400">
                     TC가 없습니다. 상단의 TC 추가 버튼을 눌러주세요.
+                  </td></tr>
+                )}
+                {tcs.length > 0 && displayedTcs.length === 0 && (
+                  <tr><td colSpan={11} className="text-center py-20 text-gray-400">
+                    <span className="text-yellow-500 font-medium">{filterResult}</span> 결과인 TC가 없습니다.
+                    <button onClick={() => setFilterResult('')} className="ml-2 text-blue-400 hover:underline text-xs">필터 해제</button>
                   </td></tr>
                 )}
               </tbody>
