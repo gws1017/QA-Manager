@@ -131,31 +131,28 @@ function runMigrations(db: Database.Database) {
   }
 
   // screenshots.caption 컬럼 추가
-  const ssCols = (db.prepare('PRAGMA table_info(screenshots)').all() as { name: string }[]).map(c => c.name);
-  if (!ssCols.includes('caption')) {
+  const screenshotCols = (db.prepare('PRAGMA table_info(screenshots)').all() as { name: string }[]).map(c => c.name);
+  if (!screenshotCols.includes('caption')) {
     db.exec(`ALTER TABLE screenshots ADD COLUMN caption TEXT NOT NULL DEFAULT ''`);
   }
 
   // issue_screenshots.caption 컬럼 추가
-  const issCols2 = (db.prepare('PRAGMA table_info(issue_screenshots)').all() as { name: string }[]).map(c => c.name);
-  if (!issCols2.includes('caption')) {
+  const issueShotCols = (db.prepare('PRAGMA table_info(issue_screenshots)').all() as { name: string }[]).map(c => c.name);
+  if (!issueShotCols.includes('caption')) {
     db.exec(`ALTER TABLE issue_screenshots ADD COLUMN caption TEXT NOT NULL DEFAULT ''`);
   }
 
-  // issues.due_date 컬럼 추가
-  const issueCols3 = (db.prepare('PRAGMA table_info(issues)').all() as { name: string }[]).map(c => c.name);
-  if (!issueCols3.includes('due_date')) {
+  // issues 컬럼 추가 (due_date / issue_project_id)
+  const issueCols = (db.prepare('PRAGMA table_info(issues)').all() as { name: string }[]).map(c => c.name);
+  if (!issueCols.includes('due_date')) {
     db.exec(`ALTER TABLE issues ADD COLUMN due_date TEXT`);
   }
-
-  // issues 테이블에 issue_project_id 컬럼 추가 (기존 DB 마이그레이션)
-  const issCols = (db.prepare('PRAGMA table_info(issues)').all() as { name: string }[]).map(c => c.name);
-  if (!issCols.includes('issue_project_id')) {
+  if (!issueCols.includes('issue_project_id')) {
     db.exec(`ALTER TABLE issues ADD COLUMN issue_project_id INTEGER`);
   }
 
   // 기존 issues의 project_id → issue_project_id 마이그레이션
-  if (issCols.includes('project_id')) {
+  if (issueCols.includes('project_id')) {
     // project_id가 있는 이슈 중 issue_project_id가 없는 것 처리
     const unmigrated = db.prepare('SELECT DISTINCT project_id FROM issues WHERE issue_project_id IS NULL AND project_id IS NOT NULL').all() as { project_id: number }[];
     for (const { project_id } of unmigrated) {
