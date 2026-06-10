@@ -142,6 +142,12 @@ function runMigrations(db: Database.Database) {
     db.exec(`ALTER TABLE issue_screenshots ADD COLUMN caption TEXT NOT NULL DEFAULT ''`);
   }
 
+  // issues.due_date 컬럼 추가
+  const issueCols3 = (db.prepare('PRAGMA table_info(issues)').all() as { name: string }[]).map(c => c.name);
+  if (!issueCols3.includes('due_date')) {
+    db.exec(`ALTER TABLE issues ADD COLUMN due_date TEXT`);
+  }
+
   // issues 테이블에 issue_project_id 컬럼 추가 (기존 DB 마이그레이션)
   const issCols = (db.prepare('PRAGMA table_info(issues)').all() as { name: string }[]).map(c => c.name);
   if (!issCols.includes('issue_project_id')) {

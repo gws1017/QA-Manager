@@ -40,8 +40,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     renumberIssues(newProjectId);
     return NextResponse.json({ ok: true });
   }
-
-  const fields = ['title', 'type', 'status', 'priority', 'description'];
+  const fields = ['title', 'type', 'status', 'priority', 'description', 'due_date'];
   const updates = fields.filter(f => f in body);
   if (!updates.length) return NextResponse.json({ error: 'no fields' }, { status: 400 });
   const sql = `UPDATE issues SET ${updates.map(f => `${f}=?`).join(',')}, updated_at=datetime('now','localtime') WHERE id=?`;

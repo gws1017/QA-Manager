@@ -6,7 +6,7 @@ import { Plus, Trash2, Copy, ChevronDown, ChevronUp, X, ImageIcon, Paperclip, Li
 type Issue = {
   id: number; project_id: number; issue_id: string; title: string;
   type: string; status: string; priority: string; description: string;
-  linked_tc_count: number; screenshot_count: number; created_at: string;
+  due_date: string | null; linked_tc_count: number; screenshot_count: number; created_at: string;
 };
 type LinkedTC = { id: number; tc_id: string; category: string; sub_category: string; module_name: string; module_id: number };
 type Screenshot = { id: number; issue_id: number; filename: string; caption: string };
@@ -401,7 +401,7 @@ export default function IssueView({
                   onChange={toggleSelectAll}
                   className="cursor-pointer accent-orange-400" />
               </th>
-              {['ID','제목','유형','상태','우선순위','TC','📎','날짜',''].map((h, i) => (
+              {['ID','제목','유형','상태','우선순위','TC','📎','날짜','마감일',''].map((h, i) => (
                 <th key={i} className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-white/10 last:border-0">{h}</th>
               ))}
             </tr>
@@ -440,6 +440,13 @@ export default function IssueView({
                     {iss.screenshot_count > 0 && <span className="flex items-center gap-1"><Paperclip size={11} className="text-blue-400" />{iss.screenshot_count}</span>}
                   </td>
                   <td className="px-3 py-2 text-gray-400 whitespace-nowrap">{iss.created_at?.slice(5, 10)}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {iss.due_date
+                      ? <span className={`text-xs font-medium ${new Date(iss.due_date) < new Date() && iss.status !== 'Closed' ? 'text-red-500' : 'text-gray-500'}`}>
+                          {iss.due_date.slice(5, 10)}
+                        </span>
+                      : <span className="text-gray-300">—</span>}
+                  </td>
                   <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
                       <button onClick={() => cloneIssue(iss.id)} className="p-1 rounded hover:bg-blue-100 text-gray-300 hover:text-blue-500" title="복제"><Copy size={13} /></button>
@@ -451,7 +458,7 @@ export default function IssueView({
 
                 {expandedId === iss.id && (
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <td colSpan={10} className="px-8 py-5">
+                    <td colSpan={11} className="px-8 py-5">
                       <div className="max-w-3xl space-y-4">
                         {/* 제목 */}
                         <div>
@@ -476,6 +483,13 @@ export default function IssueView({
                             </div>
                           ))}
                         </div>
+                        {/* 마감기한 */}
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1 font-medium">마감기한</label>
+                          <input type="date" defaultValue={iss.due_date ?? ''}
+                            onChange={e => updateIssue(iss.id, 'due_date', e.target.value || null)}
+                            className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                        </div>
                         {/* 설명 */}
                         <div>
                           <label className="block text-xs text-gray-500 mb-1 font-medium">설명 / 에러 로그</label>
@@ -495,7 +509,7 @@ export default function IssueView({
               </React.Fragment>
             ))}
             {displayed.length === 0 && (
-              <tr><td colSpan={10} className="text-center py-20 text-gray-400">
+              <tr><td colSpan={11} className="text-center py-20 text-gray-400">
                 {issues.length === 0 ? '이슈가 없습니다. 이슈 추가 버튼을 눌러주세요.' : '필터 조건에 맞는 이슈가 없습니다.'}
               </td></tr>
             )}
