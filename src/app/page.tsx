@@ -530,6 +530,7 @@ export default function Home() {
           <IssueView
             issueProjectId={selectedIssueProjectId}
             projectName={issueProjects.find(p => p.id === selectedIssueProjectId)?.name ?? ''}
+            allIssueProjects={issueProjects}
             onNavigateToTC={navigateToTC}
             jumpToIssueId={jumpToIssueId}
           />

@@ -12,7 +12,7 @@ type Issue = {
   due_date: string | null; linked_tc_count: number; screenshot_count: number; created_at: string;
 };
 type LinkedTC = { id: number; tc_id: string; category: string; sub_category: string; module_name: string; module_id: number };
-type TCOption = { id: number; tc_id: string; category: string; module_name: string };
+type TCOption = { id: number; tc_id: string; category: string; steps: string; module_name: string };
 
 /* ── 연관 TC 패널 ── */
 function LinkedTCPanel({ issueId, onNavigateToTC }: {
@@ -31,10 +31,10 @@ function LinkedTCPanel({ issueId, onNavigateToTC }: {
     Promise.all([
       fetch('/api/modules').then(r => r.json()),
       fetch('/api/testcases').then(r => r.json()),
-    ]).then(([mods, tcs]: [{ id: number; name: string }[], { id: number; tc_id: string; category: string; module_id: number }[]]) => {
+    ]).then(([mods, tcs]: [{ id: number; name: string }[], { id: number; tc_id: string; category: string; steps: string; module_id: number }[]]) => {
       const moduleNames = new Map(mods.map(m => [m.id, m.name]));
       setOptions(tcs.map(tc => ({
-        id: tc.id, tc_id: tc.tc_id, category: tc.category,
+        id: tc.id, tc_id: tc.tc_id, category: tc.category, steps: tc.steps ?? '',
         module_name: moduleNames.get(tc.module_id) ?? '',
       })));
     });
@@ -54,10 +54,12 @@ function LinkedTCPanel({ issueId, onNavigateToTC }: {
   }
 
   const linkedIds = new Set(linked.map(l => l.id));
+  const q = search.toLowerCase();
   const filtered = options.filter(o => !linkedIds.has(o.id) &&
-    (o.tc_id.toLowerCase().includes(search.toLowerCase()) ||
-     o.category?.toLowerCase().includes(search.toLowerCase()) ||
-     o.module_name.toLowerCase().includes(search.toLowerCase())));
+    (!q || o.tc_id.toLowerCase().includes(q) ||
+     o.category?.toLowerCase().includes(q) ||
+     o.steps?.toLowerCase().includes(q) ||
+     o.module_name.toLowerCase().includes(q)));
 
   return (
     <div className="mt-4">
@@ -93,16 +95,19 @@ function LinkedTCPanel({ issueId, onNavigateToTC }: {
         <div className="border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
           <div className="p-2 border-b border-gray-100">
             <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="TC ID 또는 대분류로 검색..."
+              placeholder="TC ID · 대분류 · 재현스텝으로 검색..."
               className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400" />
           </div>
           <div className="max-h-40 overflow-y-auto">
             {filtered.slice(0, 50).map(o => (
               <button key={o.id} onClick={() => link(o.id)}
-                className="w-full text-left px-3 py-1.5 hover:bg-blue-50 text-xs flex items-center gap-2 border-b border-gray-50">
-                <span className="font-mono text-blue-600 shrink-0">{o.tc_id}</span>
-                <span className="text-gray-600 truncate">{o.category}</span>
-                <span className="text-gray-400 text-[10px] ml-auto shrink-0">{o.module_name}</span>
+                className="w-full text-left px-3 py-2 hover:bg-blue-50 text-xs flex flex-col gap-0.5 border-b border-gray-50">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-blue-600 shrink-0">{o.tc_id}</span>
+                  <span className="text-gray-400 text-[10px]">{o.category}</span>
+                  <span className="text-gray-300 text-[10px] ml-auto shrink-0">[{o.module_name}]</span>
+                </div>
+                {o.steps && <span className="text-gray-600 truncate pl-0.5">{o.steps}</span>}
               </button>
             ))}
             {filtered.length === 0 && <p className="text-xs text-gray-400 p-3 text-center">결과 없음</p>}
@@ -115,10 +120,11 @@ function LinkedTCPanel({ issueId, onNavigateToTC }: {
 
 /* ── 메인 IssueView ── */
 export default function IssueView({
-  issueProjectId, projectName, onNavigateToTC, jumpToIssueId,
+  issueProjectId, projectName, allIssueProjects, onNavigateToTC, jumpToIssueId,
 }: {
   issueProjectId: number | null;
   projectName: string;
+  allIssueProjects?: { id: number; name: string }[];
   onNavigateToTC: (moduleId: number, tcId: number) => void;
   jumpToIssueId?: number | null;
 }) {
@@ -127,14 +133,10 @@ export default function IssueView({
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType]     = useState('');
   const [filterPriority, setFilterPriority] = useState('');
-  const [allIssueProjects, setAllIssueProjects] = useState<{ id: number; name: string }[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [moveTargetId, setMoveTargetId] = useState<string>('');
 
   useEffect(() => { if (issueProjectId) fetchIssues(); else setIssues([]); }, [issueProjectId]);
-  useEffect(() => {
-    fetch('/api/issue-projects').then(r => r.json()).then(setAllIssueProjects);
-  }, []);
 
   useEffect(() => {
     if (jumpToIssueId == null) return;
@@ -241,7 +243,7 @@ export default function IssueView({
               <select value={moveTargetId} onChange={e => setMoveTargetId(e.target.value)}
                 className="text-xs border border-orange-300 rounded px-2 py-1 focus:outline-none bg-orange-50">
                 <option value="">— 이동할 프로젝트 —</option>
-                {allIssueProjects.filter(p => p.id !== issueProjectId).map(p => (
+                {(allIssueProjects ?? []).filter(p => p.id !== issueProjectId).map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
