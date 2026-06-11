@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Plus, X, ImageIcon } from 'lucide-react';
+import { Plus, X, ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiPatch, apiDelete } from '@/lib/api';
 
 type Screenshot = { id: number; filename: string; caption: string };
@@ -21,9 +21,20 @@ export default function ScreenshotPanel({ endpoint, ownerKey, ownerId, className
 }) {
   const [shots, setShots] = useState<Screenshot[]>([]);
   const [dragging, setDragging] = useState(false);
-  const [lightbox, setLightbox] = useState<{ src: string; caption: string } | null>(null);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   useEffect(() => { fetchShots(); }, [ownerId]);
+
+  useEffect(() => {
+    if (lightboxIdx === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') setLightboxIdx(i => i !== null ? Math.min(i + 1, shots.length - 1) : null);
+      else if (e.key === 'ArrowLeft') setLightboxIdx(i => i !== null ? Math.max(i - 1, 0) : null);
+      else if (e.key === 'Escape') setLightboxIdx(null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightboxIdx, shots.length]);
 
   useEffect(() => {
     const handler = (e: ClipboardEvent) => {
@@ -80,7 +91,7 @@ export default function ScreenshotPanel({ endpoint, ownerKey, ownerId, className
             <div key={s.id} className="relative group flex flex-col items-center gap-1">
               <div className="relative">
                 <img src={`/screenshots/${s.filename}`} alt={s.caption || 'screenshot'}
-                  onClick={() => setLightbox({ src: `/screenshots/${s.filename}`, caption: s.caption })}
+                  onClick={() => setLightboxIdx(shots.indexOf(s))}
                   className="h-24 w-auto rounded border border-gray-200 cursor-pointer hover:opacity-90 object-cover shadow-sm" />
                 <button onClick={() => deleteShot(s.id)}
                   className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -97,15 +108,29 @@ export default function ScreenshotPanel({ endpoint, ownerKey, ownerId, className
           ))}
         </div>
       </div>
-      {lightbox && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex flex-col items-center justify-center gap-3" onClick={() => setLightbox(null)}>
-          <img src={lightbox.src} alt={lightbox.caption || 'fullsize'} className="max-w-[90vw] max-h-[85vh] rounded shadow-xl" />
-          {lightbox.caption && (
-            <p className="text-white text-sm bg-black/40 px-4 py-1.5 rounded-full">{lightbox.caption}</p>
-          )}
-          <button onClick={() => setLightbox(null)} className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 text-white rounded-full p-2"><X size={20} /></button>
-        </div>
-      )}
+      {lightboxIdx !== null && shots[lightboxIdx] && (() => {
+        const s = shots[lightboxIdx];
+        return (
+          <div className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center gap-3" onClick={() => setLightboxIdx(null)}>
+            <img src={`/screenshots/${s.filename}`} alt={s.caption || 'fullsize'} className="max-w-[90vw] max-h-[80vh] rounded shadow-xl object-contain" />
+            {s.caption && <p className="text-white text-sm bg-black/40 px-4 py-1.5 rounded-full">{s.caption}</p>}
+            <p className="text-white/50 text-xs">{lightboxIdx + 1} / {shots.length}</p>
+            {lightboxIdx > 0 && (
+              <button onClick={e => { e.stopPropagation(); setLightboxIdx(lightboxIdx - 1); }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white rounded-full p-2">
+                <ChevronLeft size={28} />
+              </button>
+            )}
+            {lightboxIdx < shots.length - 1 && (
+              <button onClick={e => { e.stopPropagation(); setLightboxIdx(lightboxIdx + 1); }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white rounded-full p-2">
+                <ChevronRight size={28} />
+              </button>
+            )}
+            <button onClick={() => setLightboxIdx(null)} className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 text-white rounded-full p-2"><X size={20} /></button>
+          </div>
+        );
+      })()}
     </>
   );
 }
