@@ -419,7 +419,7 @@ export default function Home() {
             className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs text-white/50 hover:text-white hover:bg-white/10 transition-colors">
             <HelpCircle size={13} /> 사용 가이드
           </button>
-          <p className="text-center text-[10px] text-white/25 mt-1">v1.0.0</p>
+          <p className="text-center text-[10px] text-white/25 mt-1">v1.0.1</p>
         </div>
 
         {/* ── TC 프로젝트 추가 ── */}
