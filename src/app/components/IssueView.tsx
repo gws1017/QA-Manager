@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Copy, ChevronDown, ChevronUp, X, Paperclip, Link2 } from 'lucide-react';
+import { Plus, Trash2, Copy, ChevronDown, ChevronUp, X, Paperclip, Link2, Download } from 'lucide-react';
 import { apiPost, apiPatch, apiDelete } from '@/lib/api';
 import { STATUSES, TYPES, PRIORITIES, STATUS_STYLE, TYPE_STYLE, PRIORITY_COLOR } from '@/lib/ui';
 import ScreenshotPanel from './ScreenshotPanel';
@@ -261,6 +261,10 @@ export default function IssueView({
               </button>
             </>
           )}
+          <a href={`/api/issues/export?issue_project_id=${issueProjectId}`} download
+            className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-xs">
+            <Download size={13} /> 엑셀 Export
+          </a>
           <button onClick={addIssue}
             className="flex items-center gap-1 px-3 py-1.5 bg-[#1f3864] text-white rounded hover:bg-[#2a4f8a] text-xs">
             <Plus size={13} /> 이슈 추가
