@@ -7,129 +7,10 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import IssueView from './components/IssueView';
-
-/* ───────── 도움말 모달 ───────── */
-function HelpModal({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<'tc' | 'issue' | 'common'>('tc');
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        {/* 헤더 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-bold text-[#1f3864]">사용 가이드</h2>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"><X size={18} /></button>
-        </div>
-        {/* 탭 */}
-        <div className="flex border-b shrink-0">
-          {([['tc', 'TC 관리'], ['issue', '이슈 관리'], ['common', '공통']] as const).map(([key, label]) => (
-            <button key={key} onClick={() => setTab(key)}
-              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === key ? 'border-[#1f3864] text-[#1f3864]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-              {label}
-            </button>
-          ))}
-        </div>
-        {/* 내용 */}
-        <div className="overflow-y-auto px-6 py-5 space-y-5 text-sm text-gray-700">
-          {tab === 'tc' && <>
-            <Section title="프로젝트 / 탭 관리">
-              <Item label="프로젝트 추가" desc="사이드바 하단 입력창에 이름 입력 후 + 버튼" />
-              <Item label="프로젝트 삭제" desc="사이드바 프로젝트명 우측 휴지통 아이콘 클릭 (포함된 탭·TC 전부 삭제)" />
-              <Item label="이름 변경" desc="프로젝트명 또는 탭명 더블클릭 후 수정" />
-              <Item label="탭 추가" desc="프로젝트 펼친 후 하단 + 버튼" />
-              <Item label="탭 삭제" desc="탭명 우측 휴지통 아이콘 클릭" />
-            </Section>
-            <Section title="TC 작성">
-              <Item label="TC 추가" desc="상단 'TC 추가' 버튼 클릭" />
-              <Item label="TC 수정" desc="행 클릭하면 상세 펼침 → 각 필드 직접 수정" />
-              <Item label="TC 복제" desc="행 우측 복사 아이콘 클릭 → 동일 탭 하단에 복제본 생성" />
-              <Item label="TC 삭제" desc="행 우측 휴지통 아이콘 클릭" />
-              <Item label="결과 변경" desc="행의 결과 드롭다운에서 Pass / Fail / N/A / No Run 선택" />
-            </Section>
-            <Section title="필터 / 일괄 작업">
-              <Item label="결과 필터" desc="상단 Pass · Fail · No Run 배지 클릭 → 해당 결과만 표시, 다시 클릭하면 해제" />
-              <Item label="TC 선택" desc="좌측 체크박스 클릭 (헤더 체크박스로 전체 선택)" />
-              <Item label="일괄 결과변경" desc="TC 선택 후 상단 툴바에서 결과 버튼 클릭" />
-              <Item label="일괄 탭 이동" desc="TC 선택 후 툴바 '탭 이동' 드롭다운에서 대상 탭 선택 → 이동" />
-              <Item label="일괄 삭제" desc="TC 선택 후 툴바 '일괄 삭제' 버튼 클릭" />
-            </Section>
-            <Section title="스크린샷">
-              <Item label="붙여넣기" desc="TC 상세 펼친 상태에서 Ctrl+V" />
-              <Item label="드래그&드롭" desc="이미지 파일을 점선 영역에 드롭" />
-              <Item label="파일 선택" desc="'파일 선택' 버튼 클릭" />
-              <Item label="캡션" desc="썸네일 아래 입력창에 캡션 입력 후 포커스 해제 시 저장" />
-              <Item label="확대보기" desc="썸네일 클릭 → 라이트박스에서 캡션 포함 표시" />
-            </Section>
-            <Section title="엑셀 Import / Export">
-              <Item label="Export" desc="상단 '엑셀 Export' 버튼 → 프로젝트 전체 다운로드 (탭별 시트 + 대시보드)" />
-              <Item label="Import" desc="상단 '엑셀 Import' 버튼 → Export와 동일한 형식의 파일 업로드, 기존 TC는 업데이트, 신규는 추가" />
-            </Section>
-          </>}
-          {tab === 'issue' && <>
-            <Section title="이슈 프로젝트 관리">
-              <Item label="프로젝트 추가" desc="이슈 탭 → 사이드바 하단 입력창에 이름 입력 후 + 버튼" />
-              <Item label="프로젝트 삭제" desc="프로젝트명 우측 휴지통 아이콘 (포함된 이슈 전부 삭제)" />
-              <Item label="이름 변경" desc="프로젝트명 더블클릭 후 수정" />
-            </Section>
-            <Section title="이슈 작성">
-              <Item label="이슈 추가" desc="상단 '이슈 추가' 버튼 클릭" />
-              <Item label="이슈 수정" desc="행 클릭하면 상세 펼침 → 제목·유형·우선순위·설명 수정" />
-              <Item label="상태 변경" desc="행의 상태 드롭다운에서 Open / In Progress / Resolved / Closed 선택" />
-              <Item label="이슈 복제" desc="행 우측 복사 아이콘 클릭" />
-              <Item label="이슈 삭제" desc="행 우측 휴지통 아이콘 클릭" />
-            </Section>
-            <Section title="필터 / 일괄 작업">
-              <Item label="필터" desc="상단 상태·유형·우선순위 드롭다운으로 조합 필터링" />
-              <Item label="이슈 선택" desc="좌측 체크박스 클릭 (헤더로 전체 선택)" />
-              <Item label="일괄 이동" desc="이슈 선택 후 상단 '이동할 프로젝트' 드롭다운 선택 → 이동" />
-              <Item label="일괄 삭제" desc="이슈 선택 후 상단 빨간 '삭제' 버튼 클릭" />
-            </Section>
-            <Section title="TC 연결">
-              <Item label="TC 연결" desc="이슈 상세 펼침 → '연관 TC' 패널 → 검색창에서 TC 선택" />
-              <Item label="연결 해제" desc="연결된 TC 우측 X 버튼" />
-              <Item label="TC로 이동" desc="연결된 TC 배지 클릭 → 해당 TC로 즉시 이동 및 펼침" />
-            </Section>
-            <Section title="스크린샷">
-              <Item label="첨부 방법" desc="Ctrl+V · 드래그&드롭 · 파일 선택 (TC 스크린샷과 동일)" />
-              <Item label="캡션 / 확대보기" desc="TC 스크린샷과 동일" />
-            </Section>
-          </>}
-          {tab === 'common' && <>
-            <Section title="TC ↔ 이슈 양방향 연결">
-              <Item label="이슈 → TC" desc="이슈 상세의 연관 TC 배지 클릭 → TC 관리 화면으로 이동 후 해당 TC 펼침" />
-              <Item label="TC → 이슈" desc="TC 상세의 연관 이슈 배지 클릭 → 이슈 화면으로 이동 후 해당 이슈 펼침" />
-            </Section>
-            <Section title="사이드바 뷰 전환">
-              <Item label="TC 관리" desc="상단 'TC 관리' 탭 클릭" />
-              <Item label="이슈 관리" desc="상단 '이슈' 탭 클릭 → 이슈 전용 프로젝트 목록으로 전환" />
-            </Section>
-            <Section title="데이터 저장">
-              <Item label="자동 저장" desc="모든 입력은 포커스 해제(onBlur) 또는 선택 즉시 서버에 자동 저장됨" />
-              <Item label="DB 위치" desc="서버 PC의 data/ 폴더에 SQLite 파일로 저장, 이미지는 data/screenshots/ 에 저장" />
-            </Section>
-          </>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h3 className="font-semibold text-[#1f3864] mb-2 pb-1 border-b border-gray-100">{title}</h3>
-      <div className="space-y-1.5">{children}</div>
-    </div>
-  );
-}
-
-function Item({ label, desc }: { label: string; desc: string }) {
-  return (
-    <div className="flex gap-2">
-      <span className="shrink-0 font-medium text-gray-700 w-28">{label}</span>
-      <span className="text-gray-500">{desc}</span>
-    </div>
-  );
-}
+import HelpModal from './components/HelpModal';
+import ScreenshotPanel from './components/ScreenshotPanel';
+import { apiPost, apiPatch, apiDelete } from '@/lib/api';
+import { RESULTS, RESULT_STYLE, ROW_STYLE, STATUS_STYLE, PRIORITY_COLOR } from '@/lib/ui';
 
 type Project = { id: number; name: string; description: string };
 type Module  = { id: number; project_id: number; name: string; description: string };
@@ -140,26 +21,9 @@ type TC = {
   actual_result: string; note: string; priority: string;
   screenshot_count: number;
 };
-type Screenshot = { id: number; test_case_id: number; filename: string; caption: string };
-
-const RESULTS = ['Pass', 'Fail', 'N/A', 'No Run'] as const;
-const RESULT_STYLE: Record<string, string> = {
-  Pass:    'bg-green-100 text-green-800',
-  Fail:    'bg-red-100 text-red-800 font-bold',
-  'N/A':   'bg-yellow-100 text-yellow-800',
-  'No Run':'bg-gray-100 text-gray-600',
-};
-const ROW_STYLE: Record<string, string> = {
-  Pass: 'bg-green-50', Fail: 'bg-red-50', 'N/A': 'bg-yellow-50', 'No Run': '',
-};
 
 /* ───────── TC에 연결된 이슈 패널 ───────── */
 type LinkedIssue = { id: number; issue_id: string; title: string; status: string; priority: string; type: string; issue_project_id: number };
-const STATUS_STYLE_MINI: Record<string, string> = {
-  'Open': 'bg-gray-100 text-gray-600', 'In Progress': 'bg-blue-100 text-blue-700',
-  'Resolved': 'bg-green-100 text-green-700', 'Closed': 'bg-gray-200 text-gray-500',
-};
-const PRIORITY_DOT: Record<string, string> = { Critical: 'text-red-500', High: 'text-orange-400', Medium: 'text-yellow-400', Low: 'text-blue-300' };
 
 function LinkedIssuesPanel({ tcId, onNavigateToIssue }: {
   tcId: number;
@@ -183,109 +47,14 @@ function LinkedIssuesPanel({ tcId, onNavigateToIssue }: {
             onClick={() => onNavigateToIssue(iss.issue_project_id, iss.id)}
             className="inline-flex items-center gap-1.5 px-2 py-1 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700 hover:bg-orange-100 transition-colors"
             title="해당 이슈로 이동">
-            <span className={`font-bold text-[10px] ${PRIORITY_DOT[iss.priority]}`}>●</span>
+            <span className={`font-bold text-[10px] ${PRIORITY_COLOR[iss.priority]}`}>●</span>
             <span className="font-mono font-semibold">{iss.issue_id}</span>
             <span className="text-orange-600 max-w-[160px] truncate">{iss.title}</span>
-            <span className={`px-1 py-0.5 rounded text-[10px] ${STATUS_STYLE_MINI[iss.status]}`}>{iss.status}</span>
+            <span className={`px-1 py-0.5 rounded text-[10px] ${STATUS_STYLE[iss.status]}`}>{iss.status}</span>
           </button>
         ))}
       </div>
     </div>
-  );
-}
-
-/* ───────── 스크린샷 패널 ───────── */
-function ScreenshotPanel({ tcId }: { tcId: number }) {
-  const [shots, setShots] = useState<Screenshot[]>([]);
-  const [dragging, setDragging] = useState(false);
-  const [lightbox, setLightbox] = useState<{ src: string; caption: string } | null>(null);
-
-  useEffect(() => { fetchShots(); }, [tcId]);
-
-  useEffect(() => {
-    const handler = (e: ClipboardEvent) => {
-      const items = Array.from(e.clipboardData?.items ?? []);
-      const imgItem = items.find(i => i.type.startsWith('image/'));
-      if (imgItem) { e.preventDefault(); upload(imgItem.getAsFile()!); }
-    };
-    window.addEventListener('paste', handler);
-    return () => window.removeEventListener('paste', handler);
-  }, [tcId]);
-
-  async function fetchShots() {
-    const res = await fetch(`/api/screenshots?tc_id=${tcId}`);
-    setShots(await res.json());
-  }
-  async function upload(file: File) {
-    const form = new FormData();
-    form.append('tc_id', String(tcId));
-    form.append('file', file);
-    await fetch('/api/screenshots', { method: 'POST', body: form });
-    fetchShots();
-  }
-  async function deleteShot(id: number) {
-    await fetch(`/api/screenshots/${id}`, { method: 'DELETE' });
-    setShots(prev => prev.filter(s => s.id !== id));
-  }
-  async function updateCaption(id: number, caption: string) {
-    await fetch(`/api/screenshots/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ caption }) });
-    setShots(prev => prev.map(s => s.id === id ? { ...s, caption } : s));
-  }
-
-  return (
-    <>
-      <div className="col-span-2 border-t border-gray-100 pt-4 mt-2">
-        <div className="flex items-center gap-2 mb-3">
-          <ImageIcon size={13} className="text-gray-400" />
-          <span className="text-xs font-medium text-gray-500">스크린샷</span>
-          <span className="text-xs text-gray-400">— Ctrl+V 붙여넣기 또는 드롭</span>
-          <label className="ml-auto flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs cursor-pointer text-gray-600">
-            <Plus size={11} /> 파일 선택
-            <input type="file" accept="image/*" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) { upload(f); e.target.value = ''; } }} />
-          </label>
-        </div>
-        <div
-          onDragOver={e => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={e => { e.preventDefault(); setDragging(false); const f = Array.from(e.dataTransfer.files).find(f => f.type.startsWith('image/')); if (f) upload(f); }}
-          className={`min-h-[80px] rounded-lg border-2 border-dashed p-3 flex flex-wrap gap-3 items-start transition-colors
-            ${dragging ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
-          {shots.length === 0 && !dragging && (
-            <span className="text-xs text-gray-400 m-auto">이미지를 여기에 드롭하거나 Ctrl+V로 붙여넣기</span>
-          )}
-          {shots.map(s => (
-            <div key={s.id} className="relative group flex flex-col items-center gap-1">
-              <div className="relative">
-                <img src={`/api/img/${s.filename}`} alt={s.caption || 'screenshot'}
-                  onClick={() => setLightbox({ src: `/api/img/${s.filename}`, caption: s.caption })}
-                  className="h-24 w-auto rounded border border-gray-200 cursor-pointer hover:opacity-90 object-cover shadow-sm" />
-                <button onClick={() => deleteShot(s.id)}
-                  className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <X size={10} />
-                </button>
-              </div>
-              <input
-                defaultValue={s.caption}
-                onBlur={e => { if (e.target.value !== s.caption) updateCaption(s.id, e.target.value); }}
-                placeholder="캡션 입력..."
-                className="w-24 text-[11px] text-center text-gray-500 border-0 border-b border-gray-200 bg-transparent focus:outline-none focus:border-blue-400 placeholder-gray-300 truncate"
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-      {lightbox && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex flex-col items-center justify-center gap-3" onClick={() => setLightbox(null)}>
-          <img src={lightbox.src} alt={lightbox.caption || 'fullsize'} className="max-w-[90vw] max-h-[85vh] rounded shadow-xl" />
-          {lightbox.caption && (
-            <p className="text-white text-sm bg-black/40 px-4 py-1.5 rounded-full">{lightbox.caption}</p>
-          )}
-          <button onClick={() => setLightbox(null)} className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 text-white rounded-full p-2"><X size={20} /></button>
-        </div>
-      )}
-    </>
   );
 }
 
@@ -304,7 +73,7 @@ export default function Home() {
   const [tcs, setTcs]                     = useState<TC[]>([]);
   const [expandedId, setExpandedId]       = useState<number | null>(null);
   const [importing, setImporting]         = useState(false);
-  const [selected, setSelected]           = useState<Set<number>>(new Set());
+  const [selectedTcIds, setSelectedTcIds] = useState<Set<number>>(new Set());
   const [filterResult, setFilterResult]   = useState<string>('');
   const [moveTargetModule, setMoveTargetModule] = useState<string>('');
   const [showHelp, setShowHelp]           = useState(false);
@@ -313,6 +82,7 @@ export default function Home() {
 
   // 추가 입력 상태
   const [newProjectName, setNewProjectName] = useState('');
+  const [newIssueProjectName, setNewIssueProjectName] = useState('');
   const [newModuleName, setNewModuleName]   = useState('');
   const [addingModuleFor, setAddingModuleFor] = useState<number | null>(null);
 
@@ -333,7 +103,7 @@ export default function Home() {
     if (selectedModule) {
       // 네비게이션으로 온 경우엔 expandedId 초기화 안 함
       if (scrollTargetTC.current === null) setExpandedId(null);
-      setSelected(new Set());
+      setSelectedTcIds(new Set());
       setFilterResult('');
       fetchTCs(selectedModule);
     }
@@ -378,69 +148,61 @@ export default function Home() {
     setTcs(await res.json());
   }
 
-  /* 프로젝트 */
+  /* TC 프로젝트 */
   async function addProject() {
     if (!newProjectName.trim()) return;
-    await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newProjectName }) });
+    await apiPost('/api/projects', { name: newProjectName });
     setNewProjectName('');
     fetchAll();
   }
   async function renameProject(id: number, name: string) {
     if (!name.trim()) return;
-    await fetch(`/api/projects/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim() }) });
+    await apiPatch(`/api/projects/${id}`, { name: name.trim() });
     setRenaming(null); fetchAll();
   }
-  async function renameModule(id: number, name: string) {
-    if (!name.trim()) return;
-    await fetch(`/api/modules/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim() }) });
-    setRenaming(null); fetchAll();
-  }
-
   async function deleteProject(id: number) {
     const proj = projects.find(p => p.id === id);
     if (!confirm(`"${proj?.name}" 프로젝트를 삭제할까요?\n포함된 탭과 테스트케이스가 모두 삭제됩니다.`)) return;
-    await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+    await apiDelete(`/api/projects/${id}`);
     if (selectedProjectId === id) { setSelectedModule(null); setSelectedProjectId(null); setTcs([]); }
     fetchAll();
   }
 
   /* 이슈 프로젝트 */
-  const [newIssueProjectName, setNewIssueProjectName] = useState('');
   async function addIssueProject() {
     if (!newIssueProjectName.trim()) return;
-    await fetch('/api/issue-projects', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newIssueProjectName }) });
+    await apiPost('/api/issue-projects', { name: newIssueProjectName });
     setNewIssueProjectName(''); fetchAll();
+  }
+  async function renameIssueProject(id: number, name: string) {
+    if (!name.trim()) return;
+    await apiPatch(`/api/issue-projects/${id}`, { name: name.trim() });
+    setRenaming(null); fetchAll();
   }
   async function deleteIssueProject(id: number) {
     const proj = issueProjects.find(p => p.id === id);
     if (!confirm(`"${proj?.name}" 이슈 프로젝트를 삭제할까요?\n포함된 이슈가 모두 삭제됩니다.`)) return;
-    await fetch(`/api/issue-projects/${id}`, { method: 'DELETE' });
+    await apiDelete(`/api/issue-projects/${id}`);
     if (selectedIssueProjectId === id) setSelectedIssueProjectId(null);
     fetchAll();
   }
-  async function renameIssueProject(id: number, name: string) {
-    if (!name.trim()) return;
-    await fetch(`/api/issue-projects/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim() }) });
-    setRenaming(null); fetchAll();
-  }
 
-  /* 모듈 */
+  /* 모듈(탭) */
   async function addModule(projectId: number) {
     if (!newModuleName.trim()) return;
-    await fetch('/api/modules', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newModuleName, project_id: projectId }) });
+    await apiPost('/api/modules', { name: newModuleName, project_id: projectId });
     setNewModuleName(''); setAddingModuleFor(null);
     fetchAll();
+  }
+  async function renameModule(id: number, name: string) {
+    if (!name.trim()) return;
+    await apiPatch(`/api/modules/${id}`, { name: name.trim() });
+    setRenaming(null); fetchAll();
   }
   async function deleteModule(id: number) {
     const mod = modules.find(m => m.id === id);
     if (!confirm(`"${mod?.name}" 탭을 삭제할까요?\n포함된 테스트케이스도 모두 삭제됩니다.`)) return;
-    await fetch(`/api/modules/${id}`, { method: 'DELETE' });
+    await apiDelete(`/api/modules/${id}`);
     if (selectedModule === id) { setSelectedModule(null); setTcs([]); }
     fetchAll();
   }
@@ -474,41 +236,37 @@ export default function Home() {
   /* TC */
   async function addTC() {
     if (!selectedModule) return;
-    await fetch('/api/testcases', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ module_id: selectedModule }) });
+    await apiPost('/api/testcases', { module_id: selectedModule });
     fetchTCs(selectedModule);
+  }
+  async function cloneTC(id: number) {
+    await apiPost(`/api/testcases/${id}`);
+    fetchTCs(selectedModule!);
   }
   async function deleteTC(id: number) {
     if (!confirm('삭제할까요?')) return;
-    await fetch(`/api/testcases/${id}`, { method: 'DELETE' });
-    fetchTCs(selectedModule!);
-  }
-  async function duplicateTC(id: number) {
-    await fetch(`/api/testcases/${id}`, { method: 'POST' });
+    await apiDelete(`/api/testcases/${id}`);
     fetchTCs(selectedModule!);
   }
   async function updateTC(id: number, field: string, value: string) {
-    await fetch(`/api/testcases/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: value }) });
+    await apiPatch(`/api/testcases/${id}`, { [field]: value });
     setTcs(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
   }
   async function bulkAction(action: 'delete' | 'result' | 'move', result?: string) {
-    const ids = Array.from(selected);
+    const ids = Array.from(selectedTcIds);
     if (!ids.length) return;
     if (action === 'delete' && !confirm(`${ids.length}건을 삭제할까요?`)) return;
     if (action === 'move') {
       if (!moveTargetModule) return;
       if (!confirm(`${ids.length}건을 선택한 탭으로 이동할까요?`)) return;
-      await fetch('/api/testcases/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids, action: 'move', target_module_id: Number(moveTargetModule) }) });
-      setSelected(new Set());
+      await apiPost('/api/testcases/bulk', { ids, action: 'move', target_module_id: Number(moveTargetModule) });
+      setSelectedTcIds(new Set());
       setMoveTargetModule('');
       if (selectedModule) fetchTCs(selectedModule);
       return;
     }
-    await fetch('/api/testcases/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids, action, result }) });
-    setSelected(new Set());
+    await apiPost('/api/testcases/bulk', { ids, action, result });
+    setSelectedTcIds(new Set());
     if (selectedModule) fetchTCs(selectedModule);
   }
 
@@ -526,16 +284,16 @@ export default function Home() {
   }
 
   function toggleSelect(id: number) {
-    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setSelectedTcIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
-  function toggleAll() {
-    setSelected(prev => prev.size === tcs.length ? new Set() : new Set(tcs.map(t => t.id)));
+  function toggleSelectAll() {
+    setSelectedTcIds(prev => prev.size === tcs.length ? new Set() : new Set(tcs.map(t => t.id)));
   }
   function toggleProject(id: number) {
     setExpandedProjects(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
-  const allSelected = tcs.length > 0 && selected.size === tcs.length;
+  const allSelected = tcs.length > 0 && selectedTcIds.size === tcs.length;
   const stats = {
     total: tcs.length,
     pass:  tcs.filter(t => t.result === 'Pass').length,
@@ -683,12 +441,13 @@ export default function Home() {
           </nav>
         )}
 
-        {/* ── 도움말 버튼 ── */}
+        {/* ── 도움말 버튼 + 버전 ── */}
         <div className="px-3 py-2 border-t border-white/20">
           <button onClick={() => setShowHelp(true)}
             className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs text-white/50 hover:text-white hover:bg-white/10 transition-colors">
             <HelpCircle size={13} /> 사용 가이드
           </button>
+          <p className="text-center text-[10px] text-white/25 mt-1">v1.0.1</p>
         </div>
 
         {/* ── TC 프로젝트 추가 ── */}
@@ -776,9 +535,9 @@ export default function Home() {
         </header>}
 
         {/* 일괄 작업 툴바 */}
-        {view === 'tc' && selected.size > 0 && (
+        {view === 'tc' && selectedTcIds.size > 0 && (
           <div className="bg-blue-50 border-b border-blue-200 px-6 py-2 flex items-center gap-3 shrink-0">
-            <span className="text-blue-700 font-semibold text-xs">{selected.size}건 선택됨</span>
+            <span className="text-blue-700 font-semibold text-xs">{selectedTcIds.size}건 선택됨</span>
             <span className="text-gray-300">|</span>
             <span className="text-xs text-gray-500">결과 일괄 변경:</span>
             {RESULTS.map(r => (
@@ -807,7 +566,7 @@ export default function Home() {
               className="flex items-center gap-1 px-2.5 py-1 rounded text-xs bg-blue-500 text-white hover:bg-blue-600 font-medium disabled:opacity-40 disabled:cursor-not-allowed">
               이동
             </button>
-            <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-gray-400 hover:text-gray-600">선택 해제</button>
+            <button onClick={() => setSelectedTcIds(new Set())} className="ml-auto text-xs text-gray-400 hover:text-gray-600">선택 해제</button>
           </div>
         )}
 
@@ -816,6 +575,7 @@ export default function Home() {
           <IssueView
             issueProjectId={selectedIssueProjectId}
             projectName={issueProjects.find(p => p.id === selectedIssueProjectId)?.name ?? ''}
+            allIssueProjects={issueProjects}
             onNavigateToTC={navigateToTC}
             jumpToIssueId={jumpToIssueId}
           />
@@ -833,7 +593,7 @@ export default function Home() {
               <thead className="sticky top-0 bg-[#1f3864] text-white z-10">
                 <tr>
                   <th className="px-3 py-2 w-8">
-                    <button onClick={toggleAll} className="text-white/80 hover:text-white">
+                    <button onClick={toggleSelectAll} className="text-white/80 hover:text-white">
                       {allSelected ? <CheckSquare size={14} /> : <Square size={14} />}
                     </button>
                   </th>
@@ -847,17 +607,17 @@ export default function Home() {
                   <React.Fragment key={tc.id}>
                     <tr
                       id={`tc-row-${tc.id}`}
-                      className={`border-b border-gray-200 hover:brightness-95 cursor-pointer ${selected.has(tc.id) ? 'ring-2 ring-inset ring-blue-400' : ''} ${ROW_STYLE[tc.result] ?? ''}`}
+                      className={`border-b border-gray-200 hover:brightness-95 cursor-pointer ${selectedTcIds.has(tc.id) ? 'ring-2 ring-inset ring-blue-400' : ''} ${ROW_STYLE[tc.result] ?? ''}`}
                       onClick={() => setExpandedId(expandedId === tc.id ? null : tc.id)}>
                       <td className="px-3 py-2" onClick={e => { e.stopPropagation(); toggleSelect(tc.id); }}>
-                        {selected.has(tc.id)
+                        {selectedTcIds.has(tc.id)
                           ? <CheckSquare size={14} className="text-blue-500" />
                           : <Square size={14} className="text-gray-300 hover:text-gray-500" />}
                       </td>
                       <td className="px-3 py-2 font-mono font-semibold whitespace-nowrap">
                         <div className="flex items-center gap-1">
                           {tc.tc_id}
-                          {tc.screenshot_count > 0 && <Paperclip size={11} className="text-blue-400" title={`스크린샷 ${tc.screenshot_count}개`} />}
+                          {tc.screenshot_count > 0 && <span title={`스크린샷 ${tc.screenshot_count}개`}><Paperclip size={11} className="text-blue-400" /></span>}
                         </div>
                       </td>
                       <td className="px-3 py-2 max-w-[100px] truncate" title={tc.category}>{tc.category}</td>
@@ -875,7 +635,7 @@ export default function Home() {
                       <td className="px-3 py-2 max-w-[150px] truncate" title={tc.note}>{tc.note}</td>
                       <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => duplicateTC(tc.id)} title="복제" className="p-1 rounded hover:bg-blue-100 text-gray-300 hover:text-blue-500">
+                          <button onClick={() => cloneTC(tc.id)} title="복제" className="p-1 rounded hover:bg-blue-100 text-gray-300 hover:text-blue-500">
                             <Copy size={13} />
                           </button>
                           <button onClick={() => deleteTC(tc.id)} title="삭제" className="p-1 rounded hover:bg-red-100 text-red-300 hover:text-red-600">
@@ -904,7 +664,8 @@ export default function Home() {
                               </div>
                             ))}
                             <LinkedIssuesPanel tcId={tc.id} onNavigateToIssue={navigateToIssue} />
-                            <ScreenshotPanel tcId={tc.id} />
+                            <ScreenshotPanel endpoint="/api/screenshots" ownerKey="tc_id" ownerId={tc.id}
+                              className="col-span-2 border-t border-gray-100 pt-4 mt-2" />
                           </div>
                         </td>
                       </tr>

@@ -9,9 +9,8 @@ export async function POST(req: Request) {
   const file = formData.get('file') as File | null;
   if (!file) return NextResponse.json({ error: 'file required' }, { status: 400 });
 
-  const buffer = Buffer.from(await file.arrayBuffer());
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer);
+  await wb.xlsx.load(await file.arrayBuffer());
 
   const modules = db.prepare('SELECT * FROM modules').all() as { id: number; name: string }[];
   let updated = 0, inserted = 0, skipped = 0;

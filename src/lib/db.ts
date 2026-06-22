@@ -144,22 +144,30 @@ function runMigrations(db: Database.Database) {
     db.prepare('UPDATE modules SET project_id = ? WHERE project_id IS NULL').run(proj.id);
   }
 
-  const ssCols = (db.prepare('PRAGMA table_info(screenshots)').all() as { name: string }[]).map(c => c.name);
-  if (!ssCols.includes('caption')) {
+  // screenshots.caption 컬럼 추가
+  const screenshotCols = (db.prepare('PRAGMA table_info(screenshots)').all() as { name: string }[]).map(c => c.name);
+  if (!screenshotCols.includes('caption')) {
     db.exec(`ALTER TABLE screenshots ADD COLUMN caption TEXT NOT NULL DEFAULT ''`);
   }
 
-  const issCols2 = (db.prepare('PRAGMA table_info(issue_screenshots)').all() as { name: string }[]).map(c => c.name);
-  if (!issCols2.includes('caption')) {
+  // issue_screenshots.caption 컬럼 추가
+  const issueShotCols = (db.prepare('PRAGMA table_info(issue_screenshots)').all() as { name: string }[]).map(c => c.name);
+  if (!issueShotCols.includes('caption')) {
     db.exec(`ALTER TABLE issue_screenshots ADD COLUMN caption TEXT NOT NULL DEFAULT ''`);
   }
 
-  const issCols = (db.prepare('PRAGMA table_info(issues)').all() as { name: string }[]).map(c => c.name);
-  if (!issCols.includes('issue_project_id')) {
+  // issues 컬럼 추가 (due_date / issue_project_id)
+  const issueCols = (db.prepare('PRAGMA table_info(issues)').all() as { name: string }[]).map(c => c.name);
+  if (!issueCols.includes('due_date')) {
+    db.exec(`ALTER TABLE issues ADD COLUMN due_date TEXT`);
+  }
+  if (!issueCols.includes('issue_project_id')) {
     db.exec(`ALTER TABLE issues ADD COLUMN issue_project_id INTEGER`);
   }
 
-  if (issCols.includes('project_id')) {
+  // 기존 issues의 project_id → issue_project_id 마이그레이션
+  if (issueCols.includes('project_id')) {
+    // project_id가 있는 이슈 중 issue_project_id가 없는 것 처리
     const unmigrated = db.prepare('SELECT DISTINCT project_id FROM issues WHERE issue_project_id IS NULL AND project_id IS NOT NULL').all() as { project_id: number }[];
     for (const { project_id } of unmigrated) {
       const tcProj = db.prepare('SELECT name FROM projects WHERE id = ?').get(project_id) as { name: string } | undefined;
