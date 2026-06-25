@@ -1,9 +1,10 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Copy, ChevronDown, ChevronUp, X, Paperclip, Link2, Download } from 'lucide-react';
+import { Plus, Trash2, Copy, ChevronDown, ChevronUp, X, Paperclip, Link2, Download, Upload } from 'lucide-react';
 import { apiPost, apiPatch, apiDelete } from '@/lib/api';
 import { STATUSES, TYPES, PRIORITIES, STATUS_STYLE, TYPE_STYLE, PRIORITY_COLOR } from '@/lib/ui';
 import ScreenshotPanel from './ScreenshotPanel';
+import ImportIssuesModal from './ImportIssuesModal';
 
 /* ── 타입 ── */
 type Issue = {
@@ -121,18 +122,22 @@ function LinkedTCPanel({ issueId, onNavigateToTC }: {
 /* ── 메인 IssueView ── */
 export default function IssueView({
   issueProjectId, projectName, allIssueProjects, onNavigateToTC, jumpToIssueId,
+  workspaceId, workspaces,
 }: {
   issueProjectId: number | null;
   projectName: string;
   allIssueProjects?: { id: number; name: string }[];
   onNavigateToTC: (moduleId: number, tcId: number) => void;
   jumpToIssueId?: number | null;
+  workspaceId?: number | null;
+  workspaces?: { id: number; name: string }[];
 }) {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType]     = useState('');
   const [filterPriority, setFilterPriority] = useState('');
+  const [showImport, setShowImport] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [moveTargetId, setMoveTargetId] = useState<string>('');
 
@@ -265,6 +270,10 @@ export default function IssueView({
             className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-xs">
             <Download size={13} /> 엑셀 Export
           </a>
+          <button onClick={() => setShowImport(true)}
+            className="flex items-center gap-1 px-3 py-1.5 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs">
+            <Upload size={13} /> 가져오기
+          </button>
           <button onClick={addIssue}
             className="flex items-center gap-1 px-3 py-1.5 bg-[#1f3864] text-white rounded hover:bg-[#2a4f8a] text-xs">
             <Plus size={13} /> 이슈 추가
@@ -397,6 +406,15 @@ export default function IssueView({
           </tbody>
         </table>
       </div>
+      {showImport && issueProjectId && (
+        <ImportIssuesModal
+          currentWorkspaceId={workspaceId ?? null}
+          workspaces={workspaces ?? []}
+          targetIssueProjectId={issueProjectId}
+          onClose={() => setShowImport(false)}
+          onImported={fetchIssues}
+        />
+      )}
     </div>
   );
 }

@@ -655,6 +655,8 @@ export default function Home() {
             allIssueProjects={issueProjects}
             onNavigateToTC={navigateToTC}
             jumpToIssueId={jumpToIssueId}
+            workspaceId={workspaceId}
+            workspaces={workspaces}
           />
         )}
 
