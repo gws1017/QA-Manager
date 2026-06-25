@@ -62,6 +62,11 @@ function LinkedIssuesPanel({ tcId, onNavigateToIssue }: {
 export default function Home() {
   const router = useRouter();
   const [userId, setUserId] = useState('');
+  const [workspaceId, setWorkspaceId] = useState<number | null>(null);
+  const [workspaces, setWorkspaces] = useState<{ id: number; name: string; invite_code: string; owner_user_id: string }[]>([]);
+  const [newWsName, setNewWsName] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [showWsMenu, setShowWsMenu] = useState(false);
   const [projects, setProjects]           = useState<Project[]>([]);       // TC 전용
   const [issueProjects, setIssueProjects] = useState<Project[]>([]);       // 이슈 전용
   const [modules, setModules]             = useState<Module[]>([]);
@@ -91,13 +96,38 @@ export default function Home() {
 
   useEffect(() => {
     fetchAll();
-    fetch('/api/auth/me').then(r => r.json()).then(d => { if (d.userId) setUserId(d.userId); });
+    fetch('/api/auth/me').then(r => r.json()).then(d => { if (d.userId) setUserId(d.userId); setWorkspaceId(d.workspaceId ?? null); });
+    fetch('/api/workspaces').then(r => r.json()).then(setWorkspaces);
   }, []);
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
     router.refresh();
+  }
+
+  async function switchWorkspace(id: number | null) {
+    await apiPost('/api/workspaces/switch', { workspace_id: id });
+    window.location.reload();
+  }
+  async function createWorkspace() {
+    if (!newWsName.trim()) return;
+    const ws = await (await apiPost('/api/workspaces', { name: newWsName.trim() })).json();
+    setNewWsName('');
+    await switchWorkspace(ws.id);
+  }
+  async function joinWorkspace() {
+    if (!joinCode.trim()) return;
+    const res = await apiPost('/api/workspaces/join', { invite_code: joinCode.trim() });
+    if (!res.ok) { alert((await res.json()).error ?? '참가 실패'); return; }
+    const ws = await res.json();
+    setJoinCode('');
+    await switchWorkspace(ws.id);
+  }
+  async function leaveWorkspace(id: number) {
+    if (!confirm('이 워크스페이스에서 나갈까요?')) return;
+    await apiPost('/api/workspaces/leave', { workspace_id: id });
+    window.location.reload();
   }
   useEffect(() => {
     if (selectedModule) {
@@ -318,6 +348,53 @@ export default function Home() {
               <LogOut size={14} />
             </button>
           </div>
+        </div>
+        {/* ── 워크스페이스 전환 ── */}
+        <div className="relative border-b border-white/20 shrink-0">
+          <button onClick={() => setShowWsMenu(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-xs hover:bg-white/10 transition-colors">
+            <span className="flex items-center gap-1.5 truncate">
+              <FolderOpen size={13} className="text-white/50 shrink-0" />
+              {workspaceId ? (workspaces.find(w => w.id === workspaceId)?.name ?? '워크스페이스') : '개인 스페이스'}
+            </span>
+            <ChevronDown size={13} className="text-white/40 shrink-0" />
+          </button>
+          {showWsMenu && (
+            <div className="absolute left-2 right-2 top-full mt-1 bg-white text-gray-700 rounded-lg shadow-xl z-30 overflow-hidden">
+              <button onClick={() => { setShowWsMenu(false); if (workspaceId) switchWorkspace(null); }}
+                className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-gray-50 ${!workspaceId ? 'bg-blue-50 text-blue-700 font-medium' : ''}`}>
+                개인 스페이스
+              </button>
+              {workspaces.length > 0 && <div className="border-t border-gray-100" />}
+              {workspaces.map(ws => (
+                <div key={ws.id} className={`group flex items-center px-3 py-2 text-xs hover:bg-gray-50 ${workspaceId === ws.id ? 'bg-blue-50 text-blue-700 font-medium' : ''}`}>
+                  <button onClick={() => { setShowWsMenu(false); if (workspaceId !== ws.id) switchWorkspace(ws.id); }}
+                    className="flex-1 text-left truncate">{ws.name}</button>
+                  <button onClick={() => leaveWorkspace(ws.id)} title="나가기"
+                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 shrink-0"><X size={11} /></button>
+                </div>
+              ))}
+              <div className="border-t border-gray-100 p-2 space-y-1.5">
+                <div className="flex gap-1">
+                  <input value={newWsName} onChange={e => setNewWsName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && createWorkspace()}
+                    placeholder="새 워크스페이스 이름" className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none" />
+                  <button onClick={createWorkspace} className="px-2 py-1 bg-[#1f3864] text-white rounded text-xs">+</button>
+                </div>
+                <div className="flex gap-1">
+                  <input value={joinCode} onChange={e => setJoinCode(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && joinWorkspace()}
+                    placeholder="초대코드로 참가" className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none" />
+                  <button onClick={joinWorkspace} className="px-2 py-1 bg-gray-500 text-white rounded text-xs">참가</button>
+                </div>
+                {workspaceId && (
+                  <p className="text-[10px] text-gray-400 px-1">
+                    초대코드: <span className="font-mono">{workspaces.find(w => w.id === workspaceId)?.invite_code}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
         {/* 뷰 전환 탭 */}
         <div className="flex border-b border-white/20 shrink-0">
