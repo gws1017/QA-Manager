@@ -19,10 +19,10 @@ if errorlevel 1 (
 )
 
 if not exist "node_modules" (
-    echo [초기 설치] node_modules 없음 - npm install 실행 중...
+    echo [Setup] node_modules not found - running npm install...
     call npm install
     if errorlevel 1 (
-        echo [ERROR] npm install 실패. 설치.bat 을 먼저 실행해 보세요.
+        echo [ERROR] npm install failed. Try running install.bat first.
         pause
         exit /b 1
     )
