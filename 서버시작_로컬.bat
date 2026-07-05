@@ -18,6 +18,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-npm run dev
+npx next dev -p 47291 -H 127.0.0.1
 
 pause
