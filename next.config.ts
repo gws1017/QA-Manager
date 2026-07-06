@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const nextConfig = {
+const nextConfig: NextConfig = {
   devIndicators: false,
   allowedDevOrigins: ['192.168.0.42'],
   serverExternalPackages: ['better-sqlite3'],
@@ -8,8 +8,8 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '50mb',
     },
+    proxyClientMaxBodySize: '50mb',
   },
-  middlewareClientMaxBodySize: '50mb',
-} satisfies Record<string, unknown>;
+};
 
 export default nextConfig;
