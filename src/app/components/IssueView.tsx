@@ -5,6 +5,7 @@ import { apiPost, apiPatch, apiDelete } from '@/lib/api';
 import { STATUSES, TYPES, PRIORITIES, STATUS_STYLE, TYPE_STYLE, PRIORITY_COLOR } from '@/lib/ui';
 import ScreenshotPanel from './ScreenshotPanel';
 import ImportIssuesModal from './ImportIssuesModal';
+import RichTextEditor from './RichTextEditor';
 
 /* ── 타입 ── */
 type Issue = {
@@ -383,10 +384,12 @@ export default function IssueView({
                         {/* 설명 */}
                         <div>
                           <label className="block text-xs text-gray-500 mb-1 font-medium">설명 / 에러 로그</label>
-                          <textarea rows={5} defaultValue={iss.description}
-                            onBlur={e => { if (e.target.value !== iss.description) updateIssue(iss.id, 'description', e.target.value); }}
-                            placeholder="에러 스택, 재현 방법, 메모 등..."
-                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-mono resize-y focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                          <RichTextEditor
+                            key={iss.id}
+                            value={iss.description}
+                            onChange={html => { if (html !== iss.description) updateIssue(iss.id, 'description', html); }}
+                            placeholder="에러 스택, 재현 방법, 메모 등... (표 삽입 가능)"
+                          />
                         </div>
                         {/* 연관 TC */}
                         <LinkedTCPanel issueId={iss.id} onNavigateToTC={onNavigateToTC} />
