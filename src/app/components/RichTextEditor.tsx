@@ -5,7 +5,7 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 const BTN = 'px-2 py-0.5 rounded text-xs hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed';
 const BTN_ACTIVE = 'bg-gray-200 font-bold';
@@ -19,6 +19,9 @@ export default function RichTextEditor({
   onChange: (html: string) => void;
   placeholder?: string;
 }) {
+  // 한글 IME 조합 중 이중입력 방지
+  const composing = useRef(false);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -29,11 +32,23 @@ export default function RichTextEditor({
     ],
     content: value || '',
     onUpdate({ editor }) {
+      if (composing.current) return;
       onChange(editor.getHTML());
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-xs max-w-none min-h-[80px] px-2 py-1.5 focus:outline-none text-xs leading-relaxed',
+        class: 'min-h-[80px] px-2 py-1.5 focus:outline-none text-xs leading-relaxed',
+      },
+      handleDOMEvents: {
+        compositionstart: () => { composing.current = true; return false; },
+        compositionend: (_view, event) => {
+          composing.current = false;
+          // 조합 완료 후 한 번만 onChange 발행
+          const editor = _view.state;
+          void editor; // suppress unused warning
+          // 실제 발행은 onUpdate가 처리하므로 여기선 플래그만 해제
+          return false;
+        },
       },
     },
   });
@@ -45,7 +60,7 @@ export default function RichTextEditor({
     if (current !== value) {
       editor.commands.setContent(value || '', { emitUpdate: false });
     }
-  }, [value]);
+  }, [value, editor]);
 
   if (!editor) return null;
 
@@ -109,15 +124,22 @@ export default function RichTextEditor({
       </div>
 
       <style>{`
-        .ProseMirror table { border-collapse: collapse; width: 100%; margin: 4px 0; }
-        .ProseMirror th, .ProseMirror td { border: 1px solid #d1d5db; padding: 4px 8px; min-width: 60px; }
-        .ProseMirror th { background: #f3f4f6; font-weight: 600; }
+        .ProseMirror { outline: none; }
         .ProseMirror p { margin: 2px 0; }
-        .ProseMirror ul, .ProseMirror ol { padding-left: 20px; margin: 2px 0; }
-        .ProseMirror code { background: #f1f5f9; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+        .ProseMirror ul { list-style-type: disc; padding-left: 20px; margin: 4px 0; }
+        .ProseMirror ol { list-style-type: decimal; padding-left: 20px; margin: 4px 0; }
+        .ProseMirror li { margin: 1px 0; }
+        .ProseMirror li p { margin: 0; }
+        .ProseMirror table { border-collapse: collapse; width: 100%; margin: 4px 0; }
+        .ProseMirror th, .ProseMirror td { border: 1px solid #d1d5db; padding: 4px 8px; min-width: 60px; vertical-align: top; }
+        .ProseMirror th { background: #f3f4f6; font-weight: 600; }
+        .ProseMirror code { background: #f1f5f9; padding: 1px 4px; border-radius: 3px; font-size: 11px; font-family: monospace; }
         .ProseMirror pre { background: #1e293b; color: #e2e8f0; padding: 8px; border-radius: 6px; overflow-x: auto; margin: 4px 0; }
-        .ProseMirror pre code { background: none; color: inherit; }
+        .ProseMirror pre code { background: none; color: inherit; padding: 0; }
         .ProseMirror .selectedCell { background: #dbeafe; }
+        .ProseMirror strong { font-weight: 700; }
+        .ProseMirror em { font-style: italic; }
+        .ProseMirror s { text-decoration: line-through; }
       `}</style>
     </div>
   );
