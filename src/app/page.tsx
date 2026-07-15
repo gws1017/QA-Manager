@@ -729,17 +729,17 @@ export default function Home() {
                         <td colSpan={11} className="px-8 py-4">
                           <div className="grid grid-cols-2 gap-4 max-w-4xl">
                             {([
-                              ['category','대분류',false],
-                              ['sub_category','중분류',false], ['detail','소분류',false],
-                              ['steps','재현스텝',true], ['expected','기대결과',true],
-                              ['actual_result','실제결과',false], ['note','비고',false],
-                            ] as [keyof TC, string, boolean][]).map(([field, label, wide]) => (
+                              ['category','대분류',false,1],
+                              ['sub_category','중분류',false,1], ['detail','소분류',false,1],
+                              ['steps','재현스텝',true,4], ['expected','기대결과',true,3],
+                              ['actual_result','실제결과',true,3], ['note','비고',true,2],
+                            ] as [keyof TC, string, boolean, number][]).map(([field, label, wide, rows]) => (
                               <div key={field} className={wide ? 'col-span-2' : ''}>
                                 <label className="block text-xs text-gray-500 mb-1 font-medium">{label}</label>
-                                <textarea rows={wide ? 3 : 1}
+                                <textarea rows={rows}
                                   defaultValue={String(tc[field] ?? '')}
                                   onBlur={e => { if (e.target.value !== String(tc[field] ?? '')) updateTC(tc.id, field, e.target.value); }}
-                                  className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs resize-none focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                  className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs resize-y focus:outline-none focus:ring-1 focus:ring-blue-400" />
                               </div>
                             ))}
                             <LinkedIssuesPanel tcId={tc.id} onNavigateToIssue={navigateToIssue} />
