@@ -574,8 +574,8 @@ export default function Home() {
           <p className="text-center text-[10px] text-white/25 mt-1">v1.0.1</p>
         </div>
 
-        {/* ── TC 프로젝트 추가 ── */}
-        {view === 'tc' && <div className="px-3 pt-3 pb-6 border-t border-white/20">
+        {/* ── 프로젝트 추가 (TC / 이슈 공통) ── */}
+        {(view === 'tc' || view === 'issue') && <div className="px-3 pt-3 pb-6 border-t border-white/20">
           <p className="text-white/40 text-[10px] mb-1.5 uppercase tracking-wider">새 프로젝트</p>
           <div className="flex gap-1 w-full">
             <input value={newProjectName} onChange={e => setNewProjectName(e.target.value)}
