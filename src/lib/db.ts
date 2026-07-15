@@ -156,6 +156,12 @@ function runMigrations(db: Database.Database) {
     db.exec(`ALTER TABLE issue_screenshots ADD COLUMN caption TEXT NOT NULL DEFAULT ''`);
   }
 
+  // issue_projects 에 project_id 컬럼 추가 (TC 프로젝트와 연결)
+  const ipCols = (db.prepare('PRAGMA table_info(issue_projects)').all() as { name: string }[]).map(c => c.name);
+  if (!ipCols.includes('project_id')) {
+    db.exec(`ALTER TABLE issue_projects ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL`);
+  }
+
   // issues 컬럼 추가 (due_date / issue_project_id)
   const issueCols = (db.prepare('PRAGMA table_info(issues)').all() as { name: string }[]).map(c => c.name);
   if (!issueCols.includes('due_date')) {

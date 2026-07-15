@@ -67,11 +67,14 @@ export default function Home() {
   const [newWsName, setNewWsName] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [showWsMenu, setShowWsMenu] = useState(false);
-  const [projects, setProjects]           = useState<Project[]>([]);       // TC 전용
-  const [issueProjects, setIssueProjects] = useState<Project[]>([]);       // 이슈 전용
+  const [projects, setProjects]           = useState<Project[]>([]);
+  const [issueProjects, setIssueProjects] = useState<(Project & { project_id?: number | null })[]>([]);
   const [modules, setModules]             = useState<Module[]>([]);
   const [view, setView] = useState<'tc' | 'issue'>('tc');
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
+  const [expandedIssueProjects, setExpandedIssueProjects] = useState<Set<number>>(new Set());
+  const [addingIssueTabFor, setAddingIssueTabFor] = useState<number | null>(null);
+  const [newIssueTabName, setNewIssueTabName] = useState('');
   const [selectedModule, setSelectedModule]         = useState<number | null>(null);
   const [selectedProjectId, setSelectedProjectId]   = useState<number | null>(null); // TC 프로젝트
   const [selectedIssueProjectId, setSelectedIssueProjectId] = useState<number | null>(null); // 이슈 프로젝트
@@ -87,7 +90,6 @@ export default function Home() {
 
   // 추가 입력 상태
   const [newProjectName, setNewProjectName] = useState('');
-  const [newIssueProjectName, setNewIssueProjectName] = useState('');
   const [newModuleName, setNewModuleName]   = useState('');
   const [addingModuleFor, setAddingModuleFor] = useState<number | null>(null);
 
@@ -164,6 +166,7 @@ export default function Home() {
     setModules(mods);
     setIssueProjects(iProjs);
     setExpandedProjects(new Set(projs.map(p => p.id)));
+    setExpandedIssueProjects(new Set(projs.map(p => p.id)));
     if (mods.length > 0 && !selectedModule) {
       setSelectedModule(mods[0].id);
       setSelectedProjectId(mods[0].project_id);
@@ -198,11 +201,11 @@ export default function Home() {
     fetchAll();
   }
 
-  /* 이슈 프로젝트 */
-  async function addIssueProject() {
-    if (!newIssueProjectName.trim()) return;
-    await apiPost('/api/issue-projects', { name: newIssueProjectName });
-    setNewIssueProjectName(''); fetchAll();
+  /* 이슈 탭 추가 */
+  async function addIssueTab(projectId: number) {
+    if (!newIssueTabName.trim()) return;
+    await apiPost('/api/issue-projects', { name: newIssueTabName, project_id: projectId });
+    setNewIssueTabName(''); setAddingIssueTabFor(null); fetchAll();
   }
   async function renameIssueProject(id: number, name: string) {
     if (!name.trim()) return;
@@ -487,31 +490,75 @@ export default function Home() {
           </nav>
         )}
 
-        {/* ── 이슈 뷰: 이슈 전용 프로젝트 목록 ── */}
+        {/* ── 이슈 뷰: TC처럼 프로젝트 > 이슈탭 트리 ── */}
         {view === 'issue' && (
           <nav className="flex-1 overflow-y-auto py-2 space-y-0.5">
-            {issueProjects.map(proj => (
-              <div key={proj.id}
-                className={`group flex items-center px-3 py-2.5 cursor-pointer hover:bg-white/10 rounded mx-1 transition-colors
-                  ${selectedIssueProjectId === proj.id ? 'bg-white/20 font-semibold' : ''}`}
-                onClick={() => setSelectedIssueProjectId(proj.id)}>
+            {projects.map(proj => {
+              const tabs = issueProjects.filter(ip => ip.project_id === proj.id);
+              const isOpen = expandedIssueProjects.has(proj.id);
+              return (
+                <div key={proj.id}>
+                  <div className="group flex items-center px-2 py-1.5 hover:bg-white/10 cursor-pointer rounded mx-1"
+                    onClick={() => setExpandedIssueProjects(prev => { const n = new Set(prev); n.has(proj.id) ? n.delete(proj.id) : n.add(proj.id); return n; })}>
+                    <span className="text-white/60 mr-1 shrink-0">
+                      {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </span>
+                    {isOpen
+                      ? <FolderOpen size={14} className="mr-2 text-yellow-300 shrink-0" />
+                      : <Folder    size={14} className="mr-2 text-yellow-300 shrink-0" />}
+                    <span className="flex-1 text-sm font-semibold truncate">{proj.name}</span>
+                    <button title="이슈 탭 추가" onClick={e => { e.stopPropagation(); setAddingIssueTabFor(addingIssueTabFor === proj.id ? null : proj.id); setNewIssueTabName(''); }}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/20 text-white/60 hover:text-white shrink-0">
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                  {addingIssueTabFor === proj.id && (
+                    <div className="mx-3 mb-1 flex gap-1" onClick={e => e.stopPropagation()}>
+                      <input autoFocus value={newIssueTabName} onChange={e => setNewIssueTabName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') addIssueTab(proj.id); if (e.key === 'Escape') setAddingIssueTabFor(null); }}
+                        placeholder="새 이슈탭 이름"
+                        className="min-w-0 flex-1 px-2 py-1 text-xs text-white bg-white/10 placeholder-white/40 rounded border border-white/30 focus:outline-none focus:border-white/60" />
+                      <button onClick={() => addIssueTab(proj.id)} className="px-2 py-1 bg-white/20 rounded hover:bg-white/30 text-xs shrink-0">추가</button>
+                    </div>
+                  )}
+                  {isOpen && tabs.map(tab => (
+                    <div key={tab.id}
+                      className={`group flex items-center pl-8 pr-2 py-1.5 cursor-pointer hover:bg-white/10 rounded mx-1
+                        ${selectedIssueProjectId === tab.id ? 'bg-white/20 font-semibold' : ''}`}
+                      onClick={() => setSelectedIssueProjectId(tab.id)}>
+                      {renaming?.type === 'module' && renaming.id === tab.id ? (
+                        <input autoFocus value={renaming.value}
+                          onChange={e => setRenaming({ ...renaming, value: e.target.value })}
+                          onBlur={() => renameIssueProject(tab.id, renaming.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') renameIssueProject(tab.id, renaming.value); if (e.key === 'Escape') setRenaming(null); }}
+                          onClick={e => e.stopPropagation()}
+                          className="flex-1 min-w-0 px-1 py-0 text-xs bg-white/20 text-white rounded border border-white/40 focus:outline-none" />
+                      ) : (
+                        <span className="flex-1 text-xs truncate"
+                          onDoubleClick={e => { e.stopPropagation(); setRenaming({ type: 'module', id: tab.id, value: tab.name }); }}>
+                          {tab.name}
+                        </span>
+                      )}
+                      <button onClick={e => { e.stopPropagation(); deleteIssueProject(tab.id); }}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/40 text-white/60 hover:text-white shrink-0">
+                        <X size={11} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+            {/* project_id 없는 기존 이슈탭 (미분류) */}
+            {issueProjects.filter(ip => !ip.project_id).map(tab => (
+              <div key={tab.id}
+                className={`group flex items-center px-3 py-2 cursor-pointer hover:bg-white/10 rounded mx-1
+                  ${selectedIssueProjectId === tab.id ? 'bg-white/20 font-semibold' : ''}`}
+                onClick={() => setSelectedIssueProjectId(tab.id)}>
                 <FolderOpen size={14} className="mr-2 text-orange-300 shrink-0" />
-                {renaming?.type === 'project' && renaming.id === proj.id ? (
-                  <input autoFocus value={renaming.value}
-                    onChange={e => setRenaming({ ...renaming, value: e.target.value })}
-                    onBlur={() => renameIssueProject(proj.id, renaming.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') renameIssueProject(proj.id, renaming.value); if (e.key === 'Escape') setRenaming(null); }}
-                    onClick={e => e.stopPropagation()}
-                    className="flex-1 min-w-0 px-1 py-0 text-sm bg-white/20 text-white rounded border border-white/40 focus:outline-none" />
-                ) : (
-                  <span className="flex-1 text-sm truncate"
-                    onDoubleClick={e => { e.stopPropagation(); setRenaming({ type: 'project', id: proj.id, value: proj.name }); }}>
-                    {proj.name}
-                  </span>
-                )}
-                <button title="삭제" onClick={e => { e.stopPropagation(); deleteIssueProject(proj.id); }}
+                <span className="flex-1 text-xs truncate">{tab.name}</span>
+                <button onClick={e => { e.stopPropagation(); deleteIssueProject(tab.id); }}
                   className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/40 text-white/60 hover:text-white shrink-0">
-                  <Trash2 size={12} />
+                  <X size={11} />
                 </button>
               </div>
             ))}
@@ -542,20 +589,6 @@ export default function Home() {
           </div>
         </div>}
 
-        {/* ── 이슈 프로젝트 추가 ── */}
-        {view === 'issue' && <div className="px-3 pt-3 pb-6 border-t border-white/20">
-          <p className="text-white/40 text-[10px] mb-1.5 uppercase tracking-wider">새 이슈 프로젝트</p>
-          <div className="flex gap-1 w-full">
-            <input value={newIssueProjectName} onChange={e => setNewIssueProjectName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addIssueProject()}
-              placeholder="이슈 프로젝트 이름"
-              className="min-w-0 flex-1 px-2 py-1 text-xs text-white bg-white/10 placeholder-white/40 rounded border border-white/20 focus:outline-none focus:border-white/50" />
-            <button onClick={addIssueProject}
-              className="w-8 h-7 flex items-center justify-center bg-white/20 rounded hover:bg-white/30 shrink-0">
-              <Plus size={14} />
-            </button>
-          </div>
-        </div>}
       </aside>
 
       {/* ── 메인 영역 ── */}
