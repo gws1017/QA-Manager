@@ -68,13 +68,15 @@ export default function Home() {
   const [joinCode, setJoinCode] = useState('');
   const [showWsMenu, setShowWsMenu] = useState(false);
   const [projects, setProjects]           = useState<Project[]>([]);
-  const [issueProjects, setIssueProjects] = useState<(Project & { project_id?: number | null })[]>([]);
+  const [issueGroups, setIssueGroups]     = useState<{ id: number; name: string }[]>([]);
+  const [issueProjects, setIssueProjects] = useState<(Project & { group_id?: number | null })[]>([]);
   const [modules, setModules]             = useState<Module[]>([]);
   const [view, setView] = useState<'tc' | 'issue'>('tc');
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
-  const [expandedIssueProjects, setExpandedIssueProjects] = useState<Set<number>>(new Set());
+  const [expandedIssueGroups, setExpandedIssueGroups] = useState<Set<number>>(new Set());
   const [addingIssueTabFor, setAddingIssueTabFor] = useState<number | null>(null);
   const [newIssueTabName, setNewIssueTabName] = useState('');
+  const [newIssueGroupName, setNewIssueGroupName] = useState('');
   const [selectedModule, setSelectedModule]         = useState<number | null>(null);
   const [selectedProjectId, setSelectedProjectId]   = useState<number | null>(null); // TC 프로젝트
   const [selectedIssueProjectId, setSelectedIssueProjectId] = useState<number | null>(null); // 이슈 프로젝트
@@ -156,17 +158,19 @@ export default function Home() {
   }, [tcs]);
 
   async function fetchAll() {
-    const [pRes, mRes, ipRes] = await Promise.all([
-      fetch('/api/projects'), fetch('/api/modules'), fetch('/api/issue-projects'),
+    const [pRes, mRes, ipRes, igRes] = await Promise.all([
+      fetch('/api/projects'), fetch('/api/modules'), fetch('/api/issue-projects'), fetch('/api/issue-groups'),
     ]);
     const projs: Project[]  = await pRes.json();
     const mods: Module[]    = await mRes.json();
     const iProjs: Project[] = await ipRes.json();
+    const iGroups: { id: number; name: string }[] = await igRes.json();
     setProjects(projs);
     setModules(mods);
     setIssueProjects(iProjs);
+    setIssueGroups(iGroups);
     setExpandedProjects(new Set(projs.map(p => p.id)));
-    setExpandedIssueProjects(new Set(projs.map(p => p.id)));
+    setExpandedIssueGroups(new Set(iGroups.map(g => g.id)));
     if (mods.length > 0 && !selectedModule) {
       setSelectedModule(mods[0].id);
       setSelectedProjectId(mods[0].project_id);
@@ -201,10 +205,28 @@ export default function Home() {
     fetchAll();
   }
 
+  /* 이슈 그룹 */
+  async function addIssueGroup() {
+    if (!newIssueGroupName.trim()) return;
+    await apiPost('/api/issue-groups', { name: newIssueGroupName });
+    setNewIssueGroupName(''); fetchAll();
+  }
+  async function renameIssueGroup(id: number, name: string) {
+    if (!name.trim()) return;
+    await apiPatch(`/api/issue-groups/${id}`, { name: name.trim() });
+    setRenaming(null); fetchAll();
+  }
+  async function deleteIssueGroup(id: number) {
+    const g = issueGroups.find(g => g.id === id);
+    if (!confirm(`"${g?.name}" 그룹을 삭제할까요?\n하위 이슈탭은 미분류로 이동됩니다.`)) return;
+    await apiDelete(`/api/issue-groups/${id}`);
+    fetchAll();
+  }
+
   /* 이슈 탭 추가 */
-  async function addIssueTab(projectId: number) {
+  async function addIssueTab(groupId: number) {
     if (!newIssueTabName.trim()) return;
-    await apiPost('/api/issue-projects', { name: newIssueTabName, project_id: projectId });
+    await apiPost('/api/issue-projects', { name: newIssueTabName, group_id: groupId });
     setNewIssueTabName(''); setAddingIssueTabFor(null); fetchAll();
   }
   async function renameIssueProject(id: number, name: string) {
@@ -490,35 +512,51 @@ export default function Home() {
           </nav>
         )}
 
-        {/* ── 이슈 뷰: TC처럼 프로젝트 > 이슈탭 트리 ── */}
+        {/* ── 이슈 뷰: 이슈그룹 > 이슈탭 트리 (TC와 완전 별개) ── */}
         {view === 'issue' && (
           <nav className="flex-1 overflow-y-auto py-2 space-y-0.5">
-            {projects.map(proj => {
-              const tabs = issueProjects.filter(ip => ip.project_id === proj.id);
-              const isOpen = expandedIssueProjects.has(proj.id);
+            {issueGroups.map(grp => {
+              const tabs = issueProjects.filter(ip => ip.group_id === grp.id);
+              const isOpen = expandedIssueGroups.has(grp.id);
               return (
-                <div key={proj.id}>
+                <div key={grp.id}>
                   <div className="group flex items-center px-2 py-1.5 hover:bg-white/10 cursor-pointer rounded mx-1"
-                    onClick={() => setExpandedIssueProjects(prev => { const n = new Set(prev); n.has(proj.id) ? n.delete(proj.id) : n.add(proj.id); return n; })}>
+                    onClick={() => setExpandedIssueGroups(prev => { const n = new Set(prev); n.has(grp.id) ? n.delete(grp.id) : n.add(grp.id); return n; })}>
                     <span className="text-white/60 mr-1 shrink-0">
                       {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </span>
                     {isOpen
-                      ? <FolderOpen size={14} className="mr-2 text-yellow-300 shrink-0" />
-                      : <Folder    size={14} className="mr-2 text-yellow-300 shrink-0" />}
-                    <span className="flex-1 text-sm font-semibold truncate">{proj.name}</span>
-                    <button title="이슈 탭 추가" onClick={e => { e.stopPropagation(); setAddingIssueTabFor(addingIssueTabFor === proj.id ? null : proj.id); setNewIssueTabName(''); }}
+                      ? <FolderOpen size={14} className="mr-2 text-orange-300 shrink-0" />
+                      : <Folder    size={14} className="mr-2 text-orange-300 shrink-0" />}
+                    {renaming?.type === 'project' && renaming.id === grp.id ? (
+                      <input autoFocus value={renaming.value}
+                        onChange={e => setRenaming({ ...renaming, value: e.target.value })}
+                        onBlur={() => renameIssueGroup(grp.id, renaming.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') renameIssueGroup(grp.id, renaming.value); if (e.key === 'Escape') setRenaming(null); }}
+                        onClick={e => e.stopPropagation()}
+                        className="flex-1 min-w-0 px-1 py-0 text-sm font-semibold bg-white/20 text-white rounded border border-white/40 focus:outline-none" />
+                    ) : (
+                      <span className="flex-1 text-sm font-semibold truncate"
+                        onDoubleClick={e => { e.stopPropagation(); setRenaming({ type: 'project', id: grp.id, value: grp.name }); }}>
+                        {grp.name}
+                      </span>
+                    )}
+                    <button title="이슈 탭 추가" onClick={e => { e.stopPropagation(); setAddingIssueTabFor(addingIssueTabFor === grp.id ? null : grp.id); setNewIssueTabName(''); }}
                       className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/20 text-white/60 hover:text-white shrink-0">
                       <Plus size={12} />
                     </button>
+                    <button title="그룹 삭제" onClick={e => { e.stopPropagation(); deleteIssueGroup(grp.id); }}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/40 text-white/60 hover:text-white shrink-0">
+                      <Trash2 size={12} />
+                    </button>
                   </div>
-                  {addingIssueTabFor === proj.id && (
+                  {addingIssueTabFor === grp.id && (
                     <div className="mx-3 mb-1 flex gap-1" onClick={e => e.stopPropagation()}>
                       <input autoFocus value={newIssueTabName} onChange={e => setNewIssueTabName(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') addIssueTab(proj.id); if (e.key === 'Escape') setAddingIssueTabFor(null); }}
+                        onKeyDown={e => { if (e.key === 'Enter') addIssueTab(grp.id); if (e.key === 'Escape') setAddingIssueTabFor(null); }}
                         placeholder="새 이슈탭 이름"
                         className="min-w-0 flex-1 px-2 py-1 text-xs text-white bg-white/10 placeholder-white/40 rounded border border-white/30 focus:outline-none focus:border-white/60" />
-                      <button onClick={() => addIssueTab(proj.id)} className="px-2 py-1 bg-white/20 rounded hover:bg-white/30 text-xs shrink-0">추가</button>
+                      <button onClick={() => addIssueTab(grp.id)} className="px-2 py-1 bg-white/20 rounded hover:bg-white/30 text-xs shrink-0">추가</button>
                     </div>
                   )}
                   {isOpen && tabs.map(tab => (
@@ -548,8 +586,8 @@ export default function Home() {
                 </div>
               );
             })}
-            {/* project_id 없는 기존 이슈탭 (미분류) */}
-            {issueProjects.filter(ip => !ip.project_id).map(tab => (
+            {/* group_id 없는 기존 이슈탭 (미분류) */}
+            {issueProjects.filter(ip => !ip.group_id).map(tab => (
               <div key={tab.id}
                 className={`group flex items-center px-3 py-2 cursor-pointer hover:bg-white/10 rounded mx-1
                   ${selectedIssueProjectId === tab.id ? 'bg-white/20 font-semibold' : ''}`}
@@ -574,8 +612,8 @@ export default function Home() {
           <p className="text-center text-[10px] text-white/25 mt-1">v1.0.1</p>
         </div>
 
-        {/* ── 프로젝트 추가 (TC / 이슈 공통) ── */}
-        {(view === 'tc' || view === 'issue') && <div className="px-3 pt-3 pb-6 border-t border-white/20">
+        {/* ── TC 프로젝트 추가 ── */}
+        {view === 'tc' && <div className="px-3 pt-3 pb-6 border-t border-white/20">
           <p className="text-white/40 text-[10px] mb-1.5 uppercase tracking-wider">새 프로젝트</p>
           <div className="flex gap-1 w-full">
             <input value={newProjectName} onChange={e => setNewProjectName(e.target.value)}
@@ -583,6 +621,21 @@ export default function Home() {
               placeholder="프로젝트 이름"
               className="min-w-0 flex-1 px-2 py-1 text-xs text-white bg-white/10 placeholder-white/40 rounded border border-white/20 focus:outline-none focus:border-white/50" />
             <button onClick={addProject}
+              className="w-8 h-7 flex items-center justify-center bg-white/20 rounded hover:bg-white/30 shrink-0">
+              <Plus size={14} />
+            </button>
+          </div>
+        </div>}
+
+        {/* ── 이슈 그룹 추가 ── */}
+        {view === 'issue' && <div className="px-3 pt-3 pb-6 border-t border-white/20">
+          <p className="text-white/40 text-[10px] mb-1.5 uppercase tracking-wider">새 그룹</p>
+          <div className="flex gap-1 w-full">
+            <input value={newIssueGroupName} onChange={e => setNewIssueGroupName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addIssueGroup()}
+              placeholder="그룹 이름"
+              className="min-w-0 flex-1 px-2 py-1 text-xs text-white bg-white/10 placeholder-white/40 rounded border border-white/20 focus:outline-none focus:border-white/50" />
+            <button onClick={addIssueGroup}
               className="w-8 h-7 flex items-center justify-center bg-white/20 rounded hover:bg-white/30 shrink-0">
               <Plus size={14} />
             </button>

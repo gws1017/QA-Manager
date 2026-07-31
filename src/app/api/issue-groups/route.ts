@@ -3,13 +3,13 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   const r = await withDb(); if (r instanceof NextResponse) return r;
-  return NextResponse.json(r.db.prepare('SELECT * FROM issue_projects ORDER BY group_id, id').all());
+  return NextResponse.json(r.db.prepare('SELECT * FROM issue_groups ORDER BY id').all());
 }
 
 export async function POST(req: Request) {
   const r = await withDb(); if (r instanceof NextResponse) return r;
-  const { name, group_id } = await req.json();
+  const { name } = await req.json();
   if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 });
-  const result = r.db.prepare('INSERT INTO issue_projects (name, group_id) VALUES (?, ?)').run(name, group_id ?? null);
+  const result = r.db.prepare('INSERT INTO issue_groups (name) VALUES (?)').run(name);
   return NextResponse.json({ id: result.lastInsertRowid });
 }

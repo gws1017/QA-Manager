@@ -94,6 +94,12 @@ function initSchema(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now','localtime'))
     );
 
+    CREATE TABLE IF NOT EXISTS issue_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      created_at TEXT DEFAULT (datetime('now','localtime'))
+    );
+
     CREATE TABLE IF NOT EXISTS issue_projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
@@ -156,10 +162,10 @@ function runMigrations(db: Database.Database) {
     db.exec(`ALTER TABLE issue_screenshots ADD COLUMN caption TEXT NOT NULL DEFAULT ''`);
   }
 
-  // issue_projects 에 project_id 컬럼 추가 (TC 프로젝트와 연결)
+  // issue_projects 에 group_id 컬럼 추가 (issue_groups와 연결, TC projects와 무관)
   const ipCols = (db.prepare('PRAGMA table_info(issue_projects)').all() as { name: string }[]).map(c => c.name);
-  if (!ipCols.includes('project_id')) {
-    db.exec(`ALTER TABLE issue_projects ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL`);
+  if (!ipCols.includes('group_id')) {
+    db.exec(`ALTER TABLE issue_projects ADD COLUMN group_id INTEGER REFERENCES issue_groups(id) ON DELETE SET NULL`);
   }
 
   // issues 컬럼 추가 (due_date / issue_project_id)
