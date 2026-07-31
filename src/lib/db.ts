@@ -34,9 +34,9 @@ export function getDb(userId: string): Database.Database {
   return db;
 }
 
-/** 이슈 프로젝트 내 이슈 재번호 부여 ISS-001, ISS-002... */
+/** 이슈 프로젝트 내 이슈 재번호 부여 ISS-001, ISS-002... (하위작업 제외) */
 export function renumberIssues(db: Database.Database, issueProjectId: number | string) {
-  const issues = db.prepare('SELECT id FROM issues WHERE issue_project_id = ? ORDER BY id ASC').all(issueProjectId) as { id: number }[];
+  const issues = db.prepare('SELECT id FROM issues WHERE issue_project_id = ? AND (parent_id IS NULL OR parent_id = 0) ORDER BY id ASC').all(issueProjectId) as { id: number }[];
   const update = db.prepare('UPDATE issues SET issue_id = ? WHERE id = ?');
   db.transaction(() => {
     issues.forEach((iss, i) => update.run(`ISS-${String(i + 1).padStart(3, '0')}`, iss.id));
@@ -185,13 +185,16 @@ function runMigrations(db: Database.Database) {
     `);
   }
 
-  // issues 컬럼 추가 (due_date / issue_project_id)
+  // issues 컬럼 추가 (due_date / issue_project_id / parent_id)
   const issueCols = (db.prepare('PRAGMA table_info(issues)').all() as { name: string }[]).map(c => c.name);
   if (!issueCols.includes('due_date')) {
     db.exec(`ALTER TABLE issues ADD COLUMN due_date TEXT`);
   }
   if (!issueCols.includes('issue_project_id')) {
     db.exec(`ALTER TABLE issues ADD COLUMN issue_project_id INTEGER`);
+  }
+  if (!issueCols.includes('parent_id')) {
+    db.exec(`ALTER TABLE issues ADD COLUMN parent_id INTEGER REFERENCES issues(id) ON DELETE CASCADE`);
   }
 
   // 기존 issues의 project_id → issue_project_id 마이그레이션

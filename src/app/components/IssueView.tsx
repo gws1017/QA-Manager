@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Copy, ChevronDown, ChevronUp, X, Paperclip, Link2, Download, Upload } from 'lucide-react';
+import { Plus, Trash2, Copy, ChevronDown, ChevronUp, X, Paperclip, Link2, Download, Upload, Check, CheckSquare } from 'lucide-react';
 import { apiPost, apiPatch, apiDelete } from '@/lib/api';
 import { STATUSES, TYPES, PRIORITIES, STATUS_STYLE, TYPE_STYLE, PRIORITY_COLOR } from '@/lib/ui';
 import ScreenshotPanel from './ScreenshotPanel';
@@ -12,9 +12,103 @@ type Issue = {
   id: number; issue_id: string; title: string;
   type: string; status: string; priority: string; description: string;
   due_date: string | null; linked_tc_count: number; screenshot_count: number; created_at: string;
+  parent_id: number | null;
 };
+type Subtask = { id: number; title: string; status: string; priority: string };
 type LinkedTC = { id: number; tc_id: string; category: string; sub_category: string; module_name: string; module_id: number };
 type TCOption = { id: number; tc_id: string; category: string; steps: string; module_name: string };
+
+/* ── 하위 작업 패널 ── */
+function SubtaskPanel({ issueId }: { issueId: number }) {
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+
+  useEffect(() => { fetchSubtasks(); }, [issueId]);
+
+  async function fetchSubtasks() {
+    const res = await fetch(`/api/issues/${issueId}/subtasks`);
+    setSubtasks(await res.json());
+  }
+
+  async function addSubtask() {
+    const title = newTitle.trim() || '새 하위 작업';
+    await fetch(`/api/issues/${issueId}/subtasks`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    setNewTitle(''); setAdding(false); fetchSubtasks();
+  }
+
+  async function toggleStatus(sub: Subtask) {
+    const next = sub.status === 'Closed' ? 'Open' : 'Closed';
+    await apiPatch(`/api/issues/${sub.id}`, { status: next });
+    setSubtasks(prev => prev.map(s => s.id === sub.id ? { ...s, status: next } : s));
+  }
+
+  async function deleteSubtask(id: number) {
+    await apiDelete(`/api/issues/${id}`);
+    setSubtasks(prev => prev.filter(s => s.id !== id));
+  }
+
+  const done = subtasks.filter(s => s.status === 'Closed').length;
+
+  return (
+    <div className="mt-4">
+      <div className="flex items-center gap-2 mb-2">
+        <CheckSquare size={13} className="text-gray-400" />
+        <span className="text-xs font-medium text-gray-500">하위 작업</span>
+        {subtasks.length > 0 && (
+          <span className="text-xs text-gray-400">{done}/{subtasks.length}</span>
+        )}
+        <button onClick={() => setAdding(!adding)}
+          className="ml-auto flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600">
+          <Plus size={11} /> 추가
+        </button>
+      </div>
+
+      {/* 진행률 바 */}
+      {subtasks.length > 0 && (
+        <div className="w-full h-1.5 bg-gray-100 rounded-full mb-2 overflow-hidden">
+          <div className="h-full bg-green-400 rounded-full transition-all"
+            style={{ width: `${Math.round((done / subtasks.length) * 100)}%` }} />
+        </div>
+      )}
+
+      {/* 하위 작업 목록 */}
+      <div className="space-y-1">
+        {subtasks.map(sub => (
+          <div key={sub.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 group">
+            <button onClick={() => toggleStatus(sub)}
+              className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${sub.status === 'Closed' ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-green-400'}`}>
+              {sub.status === 'Closed' && <Check size={10} />}
+            </button>
+            <span className={`flex-1 text-xs ${sub.status === 'Closed' ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+              {sub.title}
+            </span>
+            <span className={`text-[10px] px-1 py-0.5 rounded ${STATUS_STYLE[sub.status]}`}>{sub.status}</span>
+            <button onClick={() => deleteSubtask(sub.id)}
+              className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-500 text-gray-300 transition-opacity">
+              <X size={11} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* 추가 인풋 */}
+      {adding && (
+        <div className="flex gap-2 mt-2">
+          <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') addSubtask(); if (e.key === 'Escape') { setAdding(false); setNewTitle(''); } }}
+            placeholder="하위 작업 이름..."
+            className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          <button onClick={addSubtask} className="px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">추가</button>
+          <button onClick={() => { setAdding(false); setNewTitle(''); }} className="px-2 py-1 text-gray-400 hover:text-gray-600 text-xs"><X size={12} /></button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ── 연관 TC 패널 ── */
 function LinkedTCPanel({ issueId, onNavigateToTC }: {
@@ -210,6 +304,7 @@ export default function IssueView({
   }
 
   const displayed = issues.filter(i =>
+    i.parent_id == null &&
     (!filterStatus   || i.status === filterStatus) &&
     (!filterType     || i.type === filterType) &&
     (!filterPriority || i.priority === filterPriority)
@@ -391,6 +486,8 @@ export default function IssueView({
                             placeholder="에러 스택, 재현 방법, 메모 등... (표 삽입 가능)"
                           />
                         </div>
+                        {/* 하위 작업 */}
+                        <SubtaskPanel issueId={iss.id} />
                         {/* 연관 TC */}
                         <LinkedTCPanel issueId={iss.id} onNavigateToTC={onNavigateToTC} />
                         {/* 스크린샷 */}
