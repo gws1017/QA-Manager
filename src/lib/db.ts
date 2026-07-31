@@ -102,7 +102,7 @@ function initSchema(db: Database.Database) {
 
     CREATE TABLE IF NOT EXISTS issue_projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
       description TEXT,
       created_at TEXT DEFAULT (datetime('now','localtime'))
     );
@@ -162,10 +162,27 @@ function runMigrations(db: Database.Database) {
     db.exec(`ALTER TABLE issue_screenshots ADD COLUMN caption TEXT NOT NULL DEFAULT ''`);
   }
 
-  // issue_projects 에 group_id 컬럼 추가 (issue_groups와 연결, TC projects와 무관)
+  // issue_projects: name UNIQUE 제약 제거 + group_id 컬럼 추가
   const ipCols = (db.prepare('PRAGMA table_info(issue_projects)').all() as { name: string }[]).map(c => c.name);
-  if (!ipCols.includes('group_id')) {
-    db.exec(`ALTER TABLE issue_projects ADD COLUMN group_id INTEGER REFERENCES issue_groups(id) ON DELETE SET NULL`);
+  const ipIndexes = (db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='issue_projects'").all() as { sql: string }[]);
+  const hasNameUnique = ipIndexes.some(idx => idx.sql?.includes('name'));
+  if (hasNameUnique || !ipCols.includes('group_id')) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS issue_projects_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        group_id INTEGER REFERENCES issue_groups(id) ON DELETE SET NULL,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+      );
+      INSERT INTO issue_projects_new (id, name, description, group_id, created_at)
+        SELECT id, name, description,
+          ${ipCols.includes('group_id') ? 'group_id' : 'NULL'},
+          created_at
+        FROM issue_projects;
+      DROP TABLE issue_projects;
+      ALTER TABLE issue_projects_new RENAME TO issue_projects;
+    `);
   }
 
   // issues 컬럼 추가 (due_date / issue_project_id)
