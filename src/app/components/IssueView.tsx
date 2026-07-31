@@ -12,7 +12,7 @@ type Issue = {
   id: number; issue_id: string; title: string;
   type: string; status: string; priority: string; description: string;
   due_date: string | null; linked_tc_count: number; screenshot_count: number; created_at: string;
-  parent_id: number | null;
+  parent_id: number | null; assignee_id: string | null;
 };
 type Subtask = { id: number; title: string; status: string; priority: string };
 type LinkedTC = { id: number; tc_id: string; category: string; sub_category: string; module_name: string; module_id: number };
@@ -228,6 +228,7 @@ export default function IssueView({
   workspaces?: { id: number; name: string }[];
 }) {
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [members, setMembers] = useState<string[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType]     = useState('');
@@ -237,6 +238,7 @@ export default function IssueView({
   const [moveTargetId, setMoveTargetId] = useState<string>('');
 
   useEffect(() => { if (issueProjectId) fetchIssues(); else setIssues([]); }, [issueProjectId]);
+  useEffect(() => { fetch('/api/members').then(r => r.json()).then(setMembers); }, []);
 
   useEffect(() => {
     if (jumpToIssueId == null) return;
@@ -388,7 +390,7 @@ export default function IssueView({
                   onChange={toggleSelectAll}
                   className="cursor-pointer accent-orange-400" />
               </th>
-              {['ID','제목','유형','상태','우선순위','TC','📎','날짜','마감일',''].map((h, i) => (
+              {['ID','제목','유형','상태','우선순위','담당자','TC','📎','날짜','마감일',''].map((h, i) => (
                 <th key={i} className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-white/10 last:border-0">{h}</th>
               ))}
             </tr>
@@ -420,6 +422,13 @@ export default function IssueView({
                     <span className={`font-bold ${PRIORITY_COLOR[iss.priority]}`}>●</span>
                     <span className="ml-1 text-gray-600">{iss.priority}</span>
                   </td>
+                  <td className="px-3 py-2 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                    <select value={iss.assignee_id ?? ''} onChange={e => updateIssue(iss.id, 'assignee_id', e.target.value || null)}
+                      className="text-xs border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none text-gray-600 max-w-[100px]">
+                      <option value="">—</option>
+                      {members.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </td>
                   <td className="px-3 py-2 text-gray-500">
                     {iss.linked_tc_count > 0 && <span className="flex items-center gap-1"><Link2 size={11} className="text-blue-400" />{iss.linked_tc_count}</span>}
                   </td>
@@ -445,7 +454,7 @@ export default function IssueView({
 
                 {expandedId === iss.id && (
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <td colSpan={11} className="px-8 py-5">
+                    <td colSpan={12} className="px-8 py-5">
                       <div className="max-w-3xl space-y-4">
                         {/* 제목 */}
                         <div>
@@ -469,6 +478,15 @@ export default function IssueView({
                               </select>
                             </div>
                           ))}
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1 font-medium">담당자</label>
+                            <select value={iss.assignee_id ?? ''}
+                              onChange={e => updateIssue(iss.id, 'assignee_id', e.target.value || null)}
+                              className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none">
+                              <option value="">미지정</option>
+                              {members.map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                          </div>
                           <div>
                             <label className="block text-xs text-gray-500 mb-1 font-medium">마감기한</label>
                             <input type="date" defaultValue={iss.due_date ?? ''}
