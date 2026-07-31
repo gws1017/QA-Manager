@@ -26,6 +26,21 @@ export function getRegistry(): Database.Database {
       joined_at TEXT DEFAULT (datetime('now','localtime')),
       PRIMARY KEY (workspace_id, user_id)
     );
+    CREATE TABLE IF NOT EXISTS user_profiles (
+      user_id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      email_verified INTEGER NOT NULL DEFAULT 0,
+      notify_assigned INTEGER NOT NULL DEFAULT 1,
+      notify_status_change INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now','localtime'))
+    );
+    CREATE TABLE IF NOT EXISTS email_verifications (
+      user_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      code TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      PRIMARY KEY (user_id)
+    );
   `);
   return registry;
 }

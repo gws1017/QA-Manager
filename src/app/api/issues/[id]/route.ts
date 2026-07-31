@@ -1,6 +1,18 @@
 import { withDb } from '@/lib/auth';
 import { renumberIssues } from '@/lib/db';
+import { getRegistry } from '@/lib/registry';
+import { sendAssignedNotification, sendStatusChangeNotification } from '@/lib/mail';
 import { NextResponse } from 'next/server';
+
+type IssueRow = { id: number; issue_id: string; title: string; status: string; assignee_id: string | null; issue_project_id: number };
+type Profile = { email: string; email_verified: number; notify_assigned: number; notify_status_change: number };
+
+function getProfile(userId: string): Profile | undefined {
+  return getRegistry().prepare('SELECT * FROM user_profiles WHERE user_id=? AND email_verified=1').get(userId) as Profile | undefined;
+}
+function getProjectName(db: ReturnType<typeof import('@/lib/db').getDb>, projectId: number): string {
+  return (db.prepare('SELECT name FROM issue_projects WHERE id=?').get(projectId) as { name: string } | undefined)?.name ?? '';
+}
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const r = await withDb(); if (r instanceof NextResponse) return r;
@@ -40,8 +52,36 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const fields = ['title', 'type', 'status', 'priority', 'description', 'due_date', 'assignee_id'];
   const updates = fields.filter(f => f in body);
   if (!updates.length) return NextResponse.json({ error: 'no fields' }, { status: 400 });
+
+  const before = db.prepare('SELECT * FROM issues WHERE id=?').get(id) as IssueRow | undefined;
   const sql = `UPDATE issues SET ${updates.map(f => `${f}=?`).join(',')}, updated_at=datetime('now','localtime') WHERE id=?`;
   db.prepare(sql).run(...updates.map(f => body[f]), id);
+  const after = db.prepare('SELECT * FROM issues WHERE id=?').get(id) as IssueRow;
+
+  // 메일 알림 (비동기, 실패해도 응답에 영향 없음)
+  if (before) {
+    const projectName = getProjectName(db, after.issue_project_id);
+
+    if ('assignee_id' in body && body.assignee_id && body.assignee_id !== before.assignee_id) {
+      const p = getProfile(body.assignee_id);
+      if (p?.notify_assigned) {
+        sendAssignedNotification(p.email, {
+          assignee: body.assignee_id, issueId: after.issue_id, title: after.title, projectName,
+        }).catch(() => {});
+      }
+    }
+
+    if ('status' in body && body.status !== before.status && after.assignee_id) {
+      const p = getProfile(after.assignee_id);
+      if (p?.notify_status_change) {
+        sendStatusChangeNotification(p.email, {
+          issueId: after.issue_id, title: after.title, projectName,
+          oldStatus: before.status, newStatus: body.status,
+        }).catch(() => {});
+      }
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }
 

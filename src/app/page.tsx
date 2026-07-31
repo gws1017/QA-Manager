@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Download, Upload, Plus, Trash2, ChevronDown, ChevronUp,
   CheckSquare, Square, Paperclip, X, ImageIcon, Copy,
-  FolderOpen, Folder, ChevronRight, ClipboardList, Bug, LogOut, HelpCircle,
+  FolderOpen, Folder, ChevronRight, ClipboardList, Bug, LogOut, HelpCircle, Mail,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import IssueView from './components/IssueView';
@@ -369,6 +369,9 @@ export default function Home() {
           <span className="text-base font-bold tracking-wide">QA Manager</span>
           <div className="flex items-center gap-2">
             {userId && <span className="text-xs text-white/60 truncate max-w-[80px]">{userId}</span>}
+            <button onClick={() => router.push('/profile')} title="이메일 / 알림 설정" className="p-1 rounded hover:bg-white/20 text-white/60 hover:text-white">
+              <Mail size={14} />
+            </button>
             <button onClick={logout} title="로그아웃" className="p-1 rounded hover:bg-white/20 text-white/60 hover:text-white">
               <LogOut size={14} />
             </button>
