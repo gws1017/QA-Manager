@@ -164,8 +164,8 @@ function runMigrations(db: Database.Database) {
 
   // issue_projects: name UNIQUE 제약 제거 + group_id 컬럼 추가
   const ipCols = (db.prepare('PRAGMA table_info(issue_projects)').all() as { name: string }[]).map(c => c.name);
-  const ipIndexes = (db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='issue_projects'").all() as { sql: string }[]);
-  const hasNameUnique = ipIndexes.some(idx => idx.sql?.includes('name'));
+  const ipCreateSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='issue_projects'").get() as { sql: string } | undefined)?.sql ?? '';
+  const hasNameUnique = /name\s+TEXT[^,)]*UNIQUE/i.test(ipCreateSql);
   if (hasNameUnique || !ipCols.includes('group_id')) {
     db.exec(`
       CREATE TABLE IF NOT EXISTS issue_projects_new (
