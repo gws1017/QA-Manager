@@ -1,12 +1,18 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.RESEND_FROM ?? 'onboarding@resend.dev';
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_PASS,
+  },
+});
+
+const FROM = `"QA Manager" <${process.env.GMAIL_USER}>`;
 
 export async function sendVerificationCode(email: string, code: string) {
-  await resend.emails.send({
-    from: FROM,
-    to: email,
+  await transporter.sendMail({
+    from: FROM, to: email,
     subject: '[QA Manager] 이메일 인증 코드',
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
@@ -24,9 +30,8 @@ export async function sendVerificationCode(email: string, code: string) {
 export async function sendAssignedNotification(email: string, opts: {
   assignee: string; issueId: string; title: string; projectName: string;
 }) {
-  await resend.emails.send({
-    from: FROM,
-    to: email,
+  await transporter.sendMail({
+    from: FROM, to: email,
     subject: `[QA Manager] 이슈 담당자로 배정됨 · ${opts.issueId}`,
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
@@ -45,9 +50,8 @@ export async function sendAssignedNotification(email: string, opts: {
 export async function sendStatusChangeNotification(email: string, opts: {
   issueId: string; title: string; projectName: string; oldStatus: string; newStatus: string;
 }) {
-  await resend.emails.send({
-    from: FROM,
-    to: email,
+  await transporter.sendMail({
+    from: FROM, to: email,
     subject: `[QA Manager] 이슈 상태 변경 · ${opts.issueId}`,
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
