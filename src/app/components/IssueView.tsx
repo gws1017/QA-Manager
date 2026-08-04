@@ -363,7 +363,6 @@ export default function IssueView({
   }
 
   const displayed = issues.filter(i =>
-    i.parent_id == null &&
     (!filterStatus   || i.status === filterStatus) &&
     (!filterType     || i.type === filterType) &&
     (!filterPriority || i.priority === filterPriority)
@@ -457,6 +456,7 @@ export default function IssueView({
               <React.Fragment key={iss.id}>
                 <tr id={`issue-row-${iss.id}`}
                   className={`border-b border-gray-200 hover:bg-gray-50 cursor-pointer
+                  ${iss.parent_id ? 'bg-gray-50/50' : ''}
                   ${iss.status === 'Closed' ? 'opacity-60' : ''}
                   ${selectedIds.has(iss.id) ? 'bg-orange-50' : expandedId === iss.id ? 'bg-blue-50/30' : ''}`}
                   onClick={() => setExpandedId(expandedId === iss.id ? null : iss.id)}>
@@ -464,8 +464,11 @@ export default function IssueView({
                     <input type="checkbox" checked={selectedIds.has(iss.id)} onChange={() => {}}
                       className="cursor-pointer accent-orange-400" />
                   </td>
-                  <td className="px-3 py-2 font-mono font-semibold text-gray-500 whitespace-nowrap">{iss.issue_id}</td>
-                  <td className="px-3 py-2 font-medium text-gray-800 max-w-xs truncate" title={iss.title}>{iss.title || <span className="text-gray-400 italic">제목 없음</span>}</td>
+                  <td className="px-3 py-2 font-mono font-semibold text-gray-500 whitespace-nowrap">
+                    {iss.parent_id && <span className="text-gray-300 mr-1">↳</span>}
+                    {iss.issue_id}
+                  </td>
+                  <td className={`px-3 py-2 font-medium text-gray-800 max-w-xs truncate ${iss.parent_id ? 'pl-5' : ''}`} title={iss.title}>{iss.title || <span className="text-gray-400 italic">제목 없음</span>}</td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${TYPE_STYLE[iss.type]}`}>{iss.type}</span>
                   </td>
