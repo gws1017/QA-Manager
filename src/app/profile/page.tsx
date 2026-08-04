@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, CheckCircle, ArrowRight, RefreshCw } from 'lucide-react';
 
-type Profile = { email: string; email_verified: number; notify_assigned: number; notify_status_change: number };
+type Profile = { email: string; email_verified: number; display_name: string | null; notify_assigned: number; notify_status_change: number };
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -14,14 +14,16 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [displayName, setDisplayName] = useState('');
   const [notifyAssigned, setNotifyAssigned] = useState(true);
   const [notifyStatus, setNotifyStatus] = useState(true);
-  const [savingNotify, setSavingNotify] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(p => {
       setProfile(p);
       if (p) {
+        setDisplayName(p.display_name ?? '');
         setNotifyAssigned(!!p.notify_assigned);
         setNotifyStatus(!!p.notify_status_change);
       }
@@ -51,15 +53,16 @@ export default function ProfilePage() {
     if (!res.ok) { setError(data.error); return; }
     const p = await fetch('/api/profile').then(r => r.json());
     setProfile(p); setCodeSent(false); setCode(''); setEmail('');
+    setDisplayName(p?.display_name ?? '');
   }
 
-  async function saveNotify() {
-    setSavingNotify(true);
+  async function saveSettings() {
+    setSaving(true);
     await fetch('/api/profile/notify', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ notify_assigned: notifyAssigned, notify_status_change: notifyStatus }),
+      body: JSON.stringify({ display_name: displayName, notify_assigned: notifyAssigned, notify_status_change: notifyStatus }),
     });
-    setSavingNotify(false);
+    setSaving(false);
   }
 
   if (profile === 'loading') return <div className="flex items-center justify-center h-screen text-gray-400">로딩 중...</div>;
@@ -69,7 +72,7 @@ export default function ProfilePage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full max-w-md p-8">
         <div className="flex items-center gap-3 mb-6">
           <Mail size={22} className="text-[#1f3864]" />
-          <h1 className="text-lg font-bold text-gray-800">이메일 프로필</h1>
+          <h1 className="text-lg font-bold text-gray-800">프로필 설정</h1>
         </div>
 
         {/* 이메일 등록/변경 */}
@@ -123,30 +126,38 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* 알림 설정 */}
+        {/* 표시 이름 + 알림 설정 */}
         {profile?.email_verified ? (
-          <div>
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">알림 설정</h2>
-            <div className="space-y-3">
-              {[
-                ['담당자로 배정될 때', notifyAssigned, setNotifyAssigned] as const,
-                ['담당한 이슈 상태 변경될 때', notifyStatus, setNotifyStatus] as const,
-              ].map(([label, val, set]) => (
-                <label key={label} className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" checked={val} onChange={e => set(e.target.checked)}
-                    className="w-4 h-4 accent-[#1f3864] cursor-pointer" />
-                  <span className="text-sm text-gray-700">{label}</span>
-                </label>
-              ))}
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-700 mb-2">표시 이름</h2>
+              <input value={displayName} onChange={e => setDisplayName(e.target.value)}
+                placeholder="담당자란에 표시될 이름 (예: 박해성)"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <p className="text-xs text-gray-400 mt-1">비워두면 아이디로 표시됩니다.</p>
             </div>
-            <button onClick={saveNotify} disabled={savingNotify}
-              className="mt-4 w-full py-2 bg-[#1f3864] text-white rounded-lg text-sm hover:bg-[#2a4f8a] disabled:opacity-40">
-              {savingNotify ? '저장 중...' : '저장'}
+            <div>
+              <h2 className="text-sm font-semibold text-gray-700 mb-3">알림 설정</h2>
+              <div className="space-y-3">
+                {[
+                  ['담당자로 배정될 때', notifyAssigned, setNotifyAssigned] as const,
+                  ['담당한 이슈 상태 변경될 때', notifyStatus, setNotifyStatus] as const,
+                ].map(([label, val, set]) => (
+                  <label key={label} className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={val} onChange={e => set(e.target.checked)}
+                      className="w-4 h-4 accent-[#1f3864] cursor-pointer" />
+                    <span className="text-sm text-gray-700">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <button onClick={saveSettings} disabled={saving}
+              className="w-full py-2 bg-[#1f3864] text-white rounded-lg text-sm hover:bg-[#2a4f8a] disabled:opacity-40">
+              {saving ? '저장 중...' : '저장'}
             </button>
           </div>
         ) : null}
 
-        {/* 메인으로 */}
         <button onClick={() => router.push('/')}
           className="mt-6 w-full py-2 text-sm text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
           {profile?.email_verified ? '메인으로 돌아가기' : '나중에 등록하기'}

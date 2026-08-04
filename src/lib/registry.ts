@@ -30,6 +30,7 @@ export function getRegistry(): Database.Database {
       user_id TEXT PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
       email_verified INTEGER NOT NULL DEFAULT 0,
+      display_name TEXT,
       notify_assigned INTEGER NOT NULL DEFAULT 1,
       notify_status_change INTEGER NOT NULL DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now','localtime'))
@@ -42,6 +43,12 @@ export function getRegistry(): Database.Database {
       PRIMARY KEY (user_id)
     );
   `);
+  // display_name 컬럼 마이그레이션
+  const profileCols = registry.prepare("PRAGMA table_info(user_profiles)").all() as { name: string }[];
+  if (profileCols.length > 0 && !profileCols.some(c => c.name === 'display_name')) {
+    registry.exec(`ALTER TABLE user_profiles ADD COLUMN display_name TEXT`);
+  }
+
   return registry;
 }
 

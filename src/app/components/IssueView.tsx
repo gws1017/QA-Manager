@@ -20,8 +20,9 @@ type TCOption = { id: number; tc_id: string; category: string; steps: string; mo
 /* ── 하위 작업 패널 ── */
 type ChildIssue = { id: number; issue_id: string; title: string; status: string; priority: string; assignee_id: string | null };
 
-function ChildIssuePanel({ issueId, issueProjectId, onExpand, onRefresh }: {
+function ChildIssuePanel({ issueId, issueProjectId, members, onExpand, onRefresh }: {
   issueId: number; issueProjectId: number;
+  members: { id: string; display_name: string | null }[];
   onExpand: (id: number) => void;
   onRefresh: () => void;
 }) {
@@ -114,7 +115,7 @@ function ChildIssuePanel({ issueId, issueProjectId, onExpand, onRefresh }: {
                 {c.title || <span className="italic text-gray-300">제목 없음</span>}
               </span>
             </button>
-            {c.assignee_id && <span className="text-[10px] text-gray-400 shrink-0">{c.assignee_id}</span>}
+            {c.assignee_id && <span className="text-[10px] text-gray-400 shrink-0">{members.find(m => m.id === c.assignee_id)?.display_name ?? c.assignee_id}</span>}
             <span className={`text-[10px] px-1 py-0.5 rounded shrink-0 ${STATUS_STYLE[c.status]}`}>{c.status}</span>
             <button onClick={() => unlinkIssue(c.id)}
               className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-500 text-gray-300 transition-opacity shrink-0" title="연결 해제">
@@ -288,7 +289,7 @@ export default function IssueView({
   workspaces?: { id: number; name: string }[];
 }) {
   const [issues, setIssues] = useState<Issue[]>([]);
-  const [members, setMembers] = useState<string[]>([]);
+  const [members, setMembers] = useState<{ id: string; display_name: string | null }[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType]     = useState('');
@@ -490,7 +491,7 @@ export default function IssueView({
                     <select value={iss.assignee_id ?? ''} onChange={e => updateIssue(iss.id, 'assignee_id', e.target.value || null)}
                       className="text-xs border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none text-gray-600 max-w-[100px]">
                       <option value="">—</option>
-                      {members.map(m => <option key={m} value={m}>{m}</option>)}
+                      {members.map(m => <option key={m.id} value={m.id}>{m.display_name ?? m.id}</option>)}
                     </select>
                   </td>
                   <td className="px-3 py-2 text-gray-500">
@@ -548,7 +549,7 @@ export default function IssueView({
                               onChange={e => updateIssue(iss.id, 'assignee_id', e.target.value || null)}
                               className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none">
                               <option value="">미지정</option>
-                              {members.map(m => <option key={m} value={m}>{m}</option>)}
+                              {members.map(m => <option key={m.id} value={m.id}>{m.display_name ?? m.id}</option>)}
                             </select>
                           </div>
                           <div>
@@ -572,6 +573,7 @@ export default function IssueView({
                         <ChildIssuePanel
                           issueId={iss.id}
                           issueProjectId={issueProjectId!}
+                          members={members}
                           onExpand={id => { setExpandedId(id); setTimeout(() => document.getElementById(`issue-row-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100); }}
                           onRefresh={fetchIssues}
                         />

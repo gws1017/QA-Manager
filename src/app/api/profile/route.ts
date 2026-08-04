@@ -7,8 +7,8 @@ import { randomInt } from 'crypto';
 export async function GET() {
   const r = await withDb(); if (r instanceof NextResponse) return r;
   const profile = getRegistry()
-    .prepare('SELECT email, email_verified, notify_assigned, notify_status_change FROM user_profiles WHERE user_id=?')
-    .get(r.userId) as { email: string; email_verified: number; notify_assigned: number; notify_status_change: number } | undefined;
+    .prepare('SELECT email, email_verified, display_name, notify_assigned, notify_status_change FROM user_profiles WHERE user_id=?')
+    .get(r.userId) as { email: string; email_verified: number; display_name: string | null; notify_assigned: number; notify_status_change: number } | undefined;
   return NextResponse.json(profile ?? null);
 }
 
