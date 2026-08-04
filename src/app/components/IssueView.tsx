@@ -27,6 +27,9 @@ function ChildIssuePanel({ issueId, issueProjectId, onExpand }: {
   const [children, setChildren] = useState<ChildIssue[]>([]);
   const [candidates, setCandidates] = useState<ChildIssue[]>([]);
   const [showPicker, setShowPicker] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
 
   useEffect(() => { fetchChildren(); }, [issueId]);
@@ -52,6 +55,16 @@ function ChildIssuePanel({ issueId, issueProjectId, onExpand }: {
     setChildren(prev => prev.filter(c => c.id !== childId));
   }
 
+  async function createAndLink() {
+    if (!newTitle.trim()) return;
+    setCreating(true);
+    const res = await apiPost('/api/issues', { issue_project_id: issueProjectId, title: newTitle.trim() });
+    const { id: newId } = await res.json();
+    await apiPatch(`/api/issues/${newId}`, { parent_id: issueId });
+    setNewTitle(''); setShowCreate(false); setCreating(false);
+    fetchChildren();
+  }
+
   const childIds = new Set(children.map(c => c.id));
   const q = search.toLowerCase();
   const filtered = candidates.filter(c =>
@@ -67,10 +80,16 @@ function ChildIssuePanel({ issueId, issueProjectId, onExpand }: {
         <CheckSquare size={13} className="text-gray-400" />
         <span className="text-xs font-medium text-gray-500">하위 이슈</span>
         {children.length > 0 && <span className="text-xs text-gray-400">{done}/{children.length}</span>}
-        <button onClick={() => setShowPicker(!showPicker)}
-          className="ml-auto flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600">
-          <Plus size={11} /> 이슈 연결
-        </button>
+        <div className="ml-auto flex items-center gap-1">
+          <button onClick={() => { setShowCreate(!showCreate); setShowPicker(false); }}
+            className="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600">
+            <Plus size={11} /> 새 이슈
+          </button>
+          <button onClick={() => { setShowPicker(!showPicker); setShowCreate(false); }}
+            className="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600">
+            <Link2 size={11} /> 이슈 연결
+          </button>
+        </div>
       </div>
 
       {/* 진행률 바 */}
@@ -105,6 +124,22 @@ function ChildIssuePanel({ issueId, issueProjectId, onExpand }: {
           <p className="text-xs text-gray-300 px-2">연결된 하위 이슈 없음</p>
         )}
       </div>
+
+      {/* 새 이슈 생성 */}
+      {showCreate && (
+        <div className="mt-2 flex gap-2">
+          <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') createAndLink(); if (e.key === 'Escape') { setShowCreate(false); setNewTitle(''); } }}
+            placeholder="새 이슈 제목..."
+            className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          <button onClick={createAndLink} disabled={creating || !newTitle.trim()}
+            className="px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:opacity-40">
+            {creating ? '생성 중...' : '생성'}
+          </button>
+          <button onClick={() => { setShowCreate(false); setNewTitle(''); }}
+            className="px-2 py-1 text-gray-400 hover:text-gray-600"><X size={12} /></button>
+        </div>
+      )}
 
       {/* 이슈 선택 피커 */}
       {showPicker && (
