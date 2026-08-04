@@ -34,6 +34,15 @@ export function getDb(userId: string): Database.Database {
   return db;
 }
 
+/** 부모 이슈의 하위 이슈 재번호 부여 SUB-001, SUB-002... */
+export function renumberChildren(db: Database.Database, parentId: number | string) {
+  const children = db.prepare('SELECT id FROM issues WHERE parent_id = ? ORDER BY id ASC').all(parentId) as { id: number }[];
+  const update = db.prepare('UPDATE issues SET issue_id = ? WHERE id = ?');
+  db.transaction(() => {
+    children.forEach((c, i) => update.run(`SUB-${String(i + 1).padStart(3, '0')}`, c.id));
+  })();
+}
+
 /** 이슈 프로젝트 내 이슈 재번호 부여 ISS-001, ISS-002... (하위작업 제외) */
 export function renumberIssues(db: Database.Database, issueProjectId: number | string) {
   const issues = db.prepare('SELECT id FROM issues WHERE issue_project_id = ? AND (parent_id IS NULL OR parent_id = 0) ORDER BY id ASC').all(issueProjectId) as { id: number }[];

@@ -1,5 +1,5 @@
 import { withDb } from '@/lib/auth';
-import { renumberIssues } from '@/lib/db';
+import { renumberIssues, renumberChildren } from '@/lib/db';
 import { getRegistry } from '@/lib/registry';
 import { sendAssignedNotification, sendStatusChangeNotification } from '@/lib/mail';
 import { NextResponse } from 'next/server';
@@ -57,6 +57,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const sql = `UPDATE issues SET ${updates.map(f => `${f}=?`).join(',')}, updated_at=datetime('now','localtime') WHERE id=?`;
   db.prepare(sql).run(...updates.map(f => body[f]), id);
   const after = db.prepare('SELECT * FROM issues WHERE id=?').get(id) as IssueRow;
+
+  // parent_id 변경 시 번호 재정리
+  if ('parent_id' in body) {
+    const newParent = body.parent_id;
+    const oldParent = (before as unknown as { parent_id: number | null })?.parent_id;
+    if (newParent) {
+      renumberChildren(db, newParent);       // 새 부모의 SUB 번호 정리
+      renumberIssues(db, after.issue_project_id); // ISS 번호 정리 (해당 이슈 빠짐)
+    } else if (oldParent) {
+      renumberChildren(db, oldParent);       // 이전 부모의 SUB 번호 정리
+      renumberIssues(db, after.issue_project_id); // ISS 번호 재배정
+    }
+  }
 
   // 메일 알림 (비동기, 실패해도 응답에 영향 없음)
   if (before) {
