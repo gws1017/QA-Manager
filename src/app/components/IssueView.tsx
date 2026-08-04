@@ -20,9 +20,10 @@ type TCOption = { id: number; tc_id: string; category: string; steps: string; mo
 /* ── 하위 작업 패널 ── */
 type ChildIssue = { id: number; issue_id: string; title: string; status: string; priority: string; assignee_id: string | null };
 
-function ChildIssuePanel({ issueId, issueProjectId, onExpand }: {
+function ChildIssuePanel({ issueId, issueProjectId, onExpand, onRefresh }: {
   issueId: number; issueProjectId: number;
   onExpand: (id: number) => void;
+  onRefresh: () => void;
 }) {
   const [children, setChildren] = useState<ChildIssue[]>([]);
   const [candidates, setCandidates] = useState<ChildIssue[]>([]);
@@ -63,6 +64,7 @@ function ChildIssuePanel({ issueId, issueProjectId, onExpand }: {
     await apiPatch(`/api/issues/${newId}`, { parent_id: issueId });
     setNewTitle(''); setShowCreate(false); setCreating(false);
     fetchChildren();
+    onRefresh();
   }
 
   const childIds = new Set(children.map(c => c.id));
@@ -569,6 +571,7 @@ export default function IssueView({
                           issueId={iss.id}
                           issueProjectId={issueProjectId!}
                           onExpand={id => { setExpandedId(id); setTimeout(() => document.getElementById(`issue-row-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100); }}
+                          onRefresh={fetchIssues}
                         />
                         {/* 연관 TC */}
                         <LinkedTCPanel issueId={iss.id} onNavigateToTC={onNavigateToTC} />
