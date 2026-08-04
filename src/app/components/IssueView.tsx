@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Copy, ChevronDown, ChevronUp, X, Paperclip, Link2, Download, Upload, Check, CheckSquare } from 'lucide-react';
+import { Plus, Trash2, Copy, ChevronDown, ChevronUp, X, Paperclip, Link2, Download, Upload, CheckSquare } from 'lucide-react';
 import { apiPost, apiPatch, apiDelete } from '@/lib/api';
 import { STATUSES, TYPES, PRIORITIES, STATUS_STYLE, TYPE_STYLE, PRIORITY_COLOR } from '@/lib/ui';
 import ScreenshotPanel from './ScreenshotPanel';
@@ -14,122 +14,118 @@ type Issue = {
   due_date: string | null; linked_tc_count: number; screenshot_count: number; created_at: string;
   parent_id: number | null; assignee_id: string | null;
 };
-type Subtask = { id: number; title: string; status: string; priority: string };
 type LinkedTC = { id: number; tc_id: string; category: string; sub_category: string; module_name: string; module_id: number };
 type TCOption = { id: number; tc_id: string; category: string; steps: string; module_name: string };
 
 /* ── 하위 작업 패널 ── */
-function SubtaskPanel({ issueId }: { issueId: number }) {
-  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
-  const [adding, setAdding] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
+type ChildIssue = { id: number; issue_id: string; title: string; status: string; priority: string; assignee_id: string | null };
 
-  useEffect(() => { fetchSubtasks(); }, [issueId]);
+function ChildIssuePanel({ issueId, issueProjectId, onExpand }: {
+  issueId: number; issueProjectId: number;
+  onExpand: (id: number) => void;
+}) {
+  const [children, setChildren] = useState<ChildIssue[]>([]);
+  const [candidates, setCandidates] = useState<ChildIssue[]>([]);
+  const [showPicker, setShowPicker] = useState(false);
+  const [search, setSearch] = useState('');
 
-  async function fetchSubtasks() {
+  useEffect(() => { fetchChildren(); }, [issueId]);
+  useEffect(() => {
+    if (!showPicker) return;
+    fetch(`/api/issues?issue_project_id=${issueProjectId}`)
+      .then(r => r.json())
+      .then((all: ChildIssue[]) => setCandidates(all));
+  }, [showPicker, issueProjectId]);
+
+  async function fetchChildren() {
     const res = await fetch(`/api/issues/${issueId}/subtasks`);
-    setSubtasks(await res.json());
+    setChildren(await res.json());
   }
 
-  async function addSubtask() {
-    const title = newTitle.trim() || '새 하위 작업';
-    await fetch(`/api/issues/${issueId}/subtasks`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title }),
-    });
-    setNewTitle(''); setAdding(false); fetchSubtasks();
+  async function linkIssue(childId: number) {
+    await apiPatch(`/api/issues/${childId}`, { parent_id: issueId });
+    setShowPicker(false); setSearch(''); fetchChildren();
   }
 
-  async function toggleStatus(sub: Subtask) {
-    const next = sub.status === 'Closed' ? 'Open' : 'Closed';
-    await apiPatch(`/api/issues/${sub.id}`, { status: next });
-    setSubtasks(prev => prev.map(s => s.id === sub.id ? { ...s, status: next } : s));
+  async function unlinkIssue(childId: number) {
+    await apiPatch(`/api/issues/${childId}`, { parent_id: null });
+    setChildren(prev => prev.filter(c => c.id !== childId));
   }
 
-  async function deleteSubtask(id: number) {
-    await apiDelete(`/api/issues/${id}`);
-    setSubtasks(prev => prev.filter(s => s.id !== id));
-  }
+  const childIds = new Set(children.map(c => c.id));
+  const q = search.toLowerCase();
+  const filtered = candidates.filter(c =>
+    c.id !== issueId && !childIds.has(c.id) &&
+    (!q || c.issue_id.toLowerCase().includes(q) || c.title.toLowerCase().includes(q))
+  );
 
-  function startEdit(sub: Subtask) {
-    setEditingId(sub.id); setEditingTitle(sub.title);
-  }
-
-  async function saveEdit(id: number) {
-    const title = editingTitle.trim();
-    if (title) {
-      await apiPatch(`/api/issues/${id}`, { title });
-      setSubtasks(prev => prev.map(s => s.id === id ? { ...s, title } : s));
-    }
-    setEditingId(null);
-  }
-
-  const done = subtasks.filter(s => s.status === 'Closed').length;
+  const done = children.filter(c => c.status === 'Closed').length;
 
   return (
     <div className="mt-4">
       <div className="flex items-center gap-2 mb-2">
         <CheckSquare size={13} className="text-gray-400" />
-        <span className="text-xs font-medium text-gray-500">하위 작업</span>
-        {subtasks.length > 0 && (
-          <span className="text-xs text-gray-400">{done}/{subtasks.length}</span>
-        )}
-        <button onClick={() => setAdding(!adding)}
+        <span className="text-xs font-medium text-gray-500">하위 이슈</span>
+        {children.length > 0 && <span className="text-xs text-gray-400">{done}/{children.length}</span>}
+        <button onClick={() => setShowPicker(!showPicker)}
           className="ml-auto flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600">
-          <Plus size={11} /> 추가
+          <Plus size={11} /> 이슈 연결
         </button>
       </div>
 
       {/* 진행률 바 */}
-      {subtasks.length > 0 && (
+      {children.length > 0 && (
         <div className="w-full h-1.5 bg-gray-100 rounded-full mb-2 overflow-hidden">
           <div className="h-full bg-green-400 rounded-full transition-all"
-            style={{ width: `${Math.round((done / subtasks.length) * 100)}%` }} />
+            style={{ width: `${Math.round((done / children.length) * 100)}%` }} />
         </div>
       )}
 
-      {/* 하위 작업 목록 */}
+      {/* 하위 이슈 목록 */}
       <div className="space-y-1">
-        {subtasks.map(sub => (
-          <div key={sub.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 group">
-            <button onClick={() => toggleStatus(sub)}
-              className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${sub.status === 'Closed' ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-green-400'}`}>
-              {sub.status === 'Closed' && <Check size={10} />}
-            </button>
-            {editingId === sub.id ? (
-              <input autoFocus value={editingTitle} onChange={e => setEditingTitle(e.target.value)}
-                onBlur={() => saveEdit(sub.id)}
-                onKeyDown={e => { if (e.key === 'Enter') saveEdit(sub.id); if (e.key === 'Escape') setEditingId(null); }}
-                className="flex-1 text-xs px-1 py-0.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400" />
-            ) : (
-              <span onClick={() => startEdit(sub)}
-                className={`flex-1 text-xs cursor-text ${sub.status === 'Closed' ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                {sub.title}
+        {children.map(c => (
+          <div key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded border border-gray-100 bg-white hover:bg-gray-50 group">
+            <span className={`font-bold text-[10px] ${PRIORITY_COLOR[c.priority]}`}>●</span>
+            <button onClick={() => onExpand(c.id)}
+              className="flex items-center gap-1.5 flex-1 min-w-0 hover:underline text-left">
+              <span className="font-mono text-xs text-gray-400 shrink-0">{c.issue_id}</span>
+              <span className={`text-xs truncate ${c.status === 'Closed' ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                {c.title || <span className="italic text-gray-300">제목 없음</span>}
               </span>
-            )}
-            <select value={sub.status} onChange={e => { apiPatch(`/api/issues/${sub.id}`, { status: e.target.value }); setSubtasks(prev => prev.map(s => s.id === sub.id ? { ...s, status: e.target.value } : s)); }}
-              className={`text-[10px] px-1 py-0.5 rounded border-0 cursor-pointer ${STATUS_STYLE[sub.status]}`}>
-              {STATUSES.map(s => <option key={s}>{s}</option>)}
-            </select>
-            <button onClick={() => deleteSubtask(sub.id)}
-              className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-500 text-gray-300 transition-opacity">
+            </button>
+            {c.assignee_id && <span className="text-[10px] text-gray-400 shrink-0">{c.assignee_id}</span>}
+            <span className={`text-[10px] px-1 py-0.5 rounded shrink-0 ${STATUS_STYLE[c.status]}`}>{c.status}</span>
+            <button onClick={() => unlinkIssue(c.id)}
+              className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-500 text-gray-300 transition-opacity shrink-0" title="연결 해제">
               <X size={11} />
             </button>
           </div>
         ))}
+        {children.length === 0 && !showPicker && (
+          <p className="text-xs text-gray-300 px-2">연결된 하위 이슈 없음</p>
+        )}
       </div>
 
-      {/* 추가 인풋 */}
-      {adding && (
-        <div className="flex gap-2 mt-2">
-          <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') addSubtask(); if (e.key === 'Escape') { setAdding(false); setNewTitle(''); } }}
-            placeholder="하위 작업 이름..."
-            className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400" />
-          <button onClick={addSubtask} className="px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">추가</button>
-          <button onClick={() => { setAdding(false); setNewTitle(''); }} className="px-2 py-1 text-gray-400 hover:text-gray-600 text-xs"><X size={12} /></button>
+      {/* 이슈 선택 피커 */}
+      {showPicker && (
+        <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
+          <div className="p-2 border-b border-gray-100">
+            <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="이슈 ID · 제목으로 검색..."
+              className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.slice(0, 50).map(c => (
+              <button key={c.id} onClick={() => linkIssue(c.id)}
+                className="w-full text-left px-3 py-2 hover:bg-blue-50 text-xs flex items-center gap-2 border-b border-gray-50">
+                <span className={`font-bold text-[10px] ${PRIORITY_COLOR[c.priority]}`}>●</span>
+                <span className="font-mono text-gray-400 shrink-0">{c.issue_id}</span>
+                <span className="text-gray-700 truncate">{c.title || '(제목 없음)'}</span>
+                <span className={`ml-auto text-[10px] px-1 py-0.5 rounded shrink-0 ${STATUS_STYLE[c.status]}`}>{c.status}</span>
+              </button>
+            ))}
+            {filtered.length === 0 && <p className="text-xs text-gray-400 p-3 text-center">연결 가능한 이슈 없음</p>}
+          </div>
         </div>
       )}
     </div>
@@ -530,8 +526,12 @@ export default function IssueView({
                             placeholder="에러 스택, 재현 방법, 메모 등... (표 삽입 가능)"
                           />
                         </div>
-                        {/* 하위 작업 */}
-                        <SubtaskPanel issueId={iss.id} />
+                        {/* 하위 이슈 */}
+                        <ChildIssuePanel
+                          issueId={iss.id}
+                          issueProjectId={issueProjectId!}
+                          onExpand={id => { setExpandedId(id); setTimeout(() => document.getElementById(`issue-row-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100); }}
+                        />
                         {/* 연관 TC */}
                         <LinkedTCPanel issueId={iss.id} onNavigateToTC={onNavigateToTC} />
                         {/* 스크린샷 */}

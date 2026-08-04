@@ -49,7 +49,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     renumberIssues(db, newProjectId);
     return NextResponse.json({ ok: true });
   }
-  const fields = ['title', 'type', 'status', 'priority', 'description', 'due_date', 'assignee_id'];
+  const fields = ['title', 'type', 'status', 'priority', 'description', 'due_date', 'assignee_id', 'parent_id'];
   const updates = fields.filter(f => f in body);
   if (!updates.length) return NextResponse.json({ error: 'no fields' }, { status: 400 });
 
