@@ -275,12 +275,13 @@ function LinkedTCPanel({ issueId, onNavigateToTC }: {
 
 /* ── 메인 IssueView ── */
 export default function IssueView({
-  issueProjectId, projectName, allIssueProjects, onNavigateToTC, jumpToIssueId,
+  issueProjectId, projectName, allIssueProjects, issueGroups, onNavigateToTC, jumpToIssueId,
   workspaceId, workspaces,
 }: {
   issueProjectId: number | null;
   projectName: string;
-  allIssueProjects?: { id: number; name: string }[];
+  allIssueProjects?: { id: number; name: string; group_id?: number | null }[];
+  issueGroups?: { id: number; name: string }[];
   onNavigateToTC: (moduleId: number, tcId: number) => void;
   jumpToIssueId?: number | null;
   workspaceId?: number | null;
@@ -404,9 +405,10 @@ export default function IssueView({
               <select value={moveTargetId} onChange={e => setMoveTargetId(e.target.value)}
                 className="text-xs border border-orange-300 rounded px-2 py-1 focus:outline-none bg-orange-50">
                 <option value="">— 이동할 프로젝트 —</option>
-                {(allIssueProjects ?? []).filter(p => p.id !== issueProjectId).map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                {(allIssueProjects ?? []).filter(p => p.id !== issueProjectId).map(p => {
+                  const groupName = issueGroups?.find(g => g.id === p.group_id)?.name;
+                  return <option key={p.id} value={p.id}>{groupName ? `${groupName} > ${p.name}` : p.name}</option>;
+                })}
               </select>
               <button onClick={moveSelected} disabled={!moveTargetId}
                 className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white rounded hover:bg-orange-600 text-xs disabled:opacity-40 disabled:cursor-not-allowed">

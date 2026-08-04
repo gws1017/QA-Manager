@@ -742,6 +742,7 @@ export default function Home() {
             issueProjectId={selectedIssueProjectId}
             projectName={issueProjects.find(p => p.id === selectedIssueProjectId)?.name ?? ''}
             allIssueProjects={issueProjects}
+            issueGroups={issueGroups}
             onNavigateToTC={navigateToTC}
             jumpToIssueId={jumpToIssueId}
             workspaceId={workspaceId}
