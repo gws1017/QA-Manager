@@ -75,7 +75,7 @@ function ChildIssuePanel({ issueId, issueProjectId, members, onExpand, onRefresh
     (!q || c.issue_id.toLowerCase().includes(q) || c.title.toLowerCase().includes(q))
   );
 
-  const done = children.filter(c => c.status === 'Closed').length;
+  const done = children.filter(c => c.status === 'Closed' || c.status === 'Resolved').length;
 
   return (
     <div className="mt-4">
@@ -111,7 +111,7 @@ function ChildIssuePanel({ issueId, issueProjectId, members, onExpand, onRefresh
             <button onClick={() => onExpand(c.id)}
               className="flex items-center gap-1.5 flex-1 min-w-0 hover:underline text-left">
               <span className="font-mono text-xs text-gray-400 shrink-0">{c.issue_id}</span>
-              <span className={`text-xs truncate ${c.status === 'Closed' ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+              <span className={`text-xs truncate ${c.status === 'Closed' || c.status === 'Resolved' ? 'line-through text-gray-400' : 'text-gray-700'}`}>
                 {c.title || <span className="italic text-gray-300">제목 없음</span>}
               </span>
             </button>
