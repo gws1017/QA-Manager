@@ -23,6 +23,8 @@ function SubtaskPanel({ issueId }: { issueId: number }) {
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
 
   useEffect(() => { fetchSubtasks(); }, [issueId]);
 
@@ -49,6 +51,19 @@ function SubtaskPanel({ issueId }: { issueId: number }) {
   async function deleteSubtask(id: number) {
     await apiDelete(`/api/issues/${id}`);
     setSubtasks(prev => prev.filter(s => s.id !== id));
+  }
+
+  function startEdit(sub: Subtask) {
+    setEditingId(sub.id); setEditingTitle(sub.title);
+  }
+
+  async function saveEdit(id: number) {
+    const title = editingTitle.trim();
+    if (title) {
+      await apiPatch(`/api/issues/${id}`, { title });
+      setSubtasks(prev => prev.map(s => s.id === id ? { ...s, title } : s));
+    }
+    setEditingId(null);
   }
 
   const done = subtasks.filter(s => s.status === 'Closed').length;
@@ -83,10 +98,21 @@ function SubtaskPanel({ issueId }: { issueId: number }) {
               className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${sub.status === 'Closed' ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-green-400'}`}>
               {sub.status === 'Closed' && <Check size={10} />}
             </button>
-            <span className={`flex-1 text-xs ${sub.status === 'Closed' ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-              {sub.title}
-            </span>
-            <span className={`text-[10px] px-1 py-0.5 rounded ${STATUS_STYLE[sub.status]}`}>{sub.status}</span>
+            {editingId === sub.id ? (
+              <input autoFocus value={editingTitle} onChange={e => setEditingTitle(e.target.value)}
+                onBlur={() => saveEdit(sub.id)}
+                onKeyDown={e => { if (e.key === 'Enter') saveEdit(sub.id); if (e.key === 'Escape') setEditingId(null); }}
+                className="flex-1 text-xs px-1 py-0.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            ) : (
+              <span onClick={() => startEdit(sub)}
+                className={`flex-1 text-xs cursor-text ${sub.status === 'Closed' ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                {sub.title}
+              </span>
+            )}
+            <select value={sub.status} onChange={e => { apiPatch(`/api/issues/${sub.id}`, { status: e.target.value }); setSubtasks(prev => prev.map(s => s.id === sub.id ? { ...s, status: e.target.value } : s)); }}
+              className={`text-[10px] px-1 py-0.5 rounded border-0 cursor-pointer ${STATUS_STYLE[sub.status]}`}>
+              {STATUSES.map(s => <option key={s}>{s}</option>)}
+            </select>
             <button onClick={() => deleteSubtask(sub.id)}
               className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-500 text-gray-300 transition-opacity">
               <X size={11} />
