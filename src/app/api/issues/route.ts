@@ -30,9 +30,9 @@ export async function POST(req: Request) {
   const hasLegacy = cols.includes('project_id');
   let res;
   if (hasLegacy) {
-    res = db.prepare(`INSERT INTO issues (issue_project_id, project_id, issue_id, title) VALUES (?, 1, 'ISS-000', ?)`).run(issue_project_id, title ?? '새 이슈');
+    res = db.prepare(`INSERT INTO issues (issue_project_id, project_id, issue_id, title, created_by) VALUES (?, 1, 'ISS-000', ?, ?)`).run(issue_project_id, title ?? '새 이슈', r.userId);
   } else {
-    res = db.prepare(`INSERT INTO issues (issue_project_id, issue_id, title) VALUES (?, 'ISS-000', ?)`).run(issue_project_id, title ?? '새 이슈');
+    res = db.prepare(`INSERT INTO issues (issue_project_id, issue_id, title, created_by) VALUES (?, 'ISS-000', ?, ?)`).run(issue_project_id, title ?? '새 이슈', r.userId);
   }
   renumberIssues(db, issue_project_id);
   return NextResponse.json({ id: res.lastInsertRowid });

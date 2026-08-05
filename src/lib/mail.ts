@@ -47,6 +47,27 @@ export async function sendAssignedNotification(email: string, opts: {
   });
 }
 
+export async function sendIssueChangedNotification(email: string, opts: {
+  issueId: string; title: string; projectName: string; changeType: string; newValue: string;
+}) {
+  await transporter.sendMail({
+    from: FROM, to: email,
+    subject: `[QA Manager] 내 이슈가 변경됨 · ${opts.issueId}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
+        <h2 style="color:#1f3864;margin-bottom:8px">이슈 변경 알림</h2>
+        <p style="color:#555">작성한 이슈가 변경되었습니다.</p>
+        <div style="background:#f4f6fb;border-radius:8px;padding:16px;margin:16px 0">
+          <div style="font-size:12px;color:#888">${opts.projectName}</div>
+          <div style="font-weight:bold;color:#1f3864">${opts.issueId}</div>
+          <div style="color:#333;margin-top:4px">${opts.title || '(제목 없음)'}</div>
+        </div>
+        <p style="color:#555"><strong>${opts.changeType}</strong> → <strong style="color:#1f3864">${opts.newValue}</strong></p>
+      </div>
+    `,
+  });
+}
+
 export async function sendStatusChangeNotification(email: string, opts: {
   issueId: string; title: string; projectName: string; oldStatus: string; newStatus: string;
 }) {

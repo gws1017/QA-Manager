@@ -208,6 +208,9 @@ function runMigrations(db: Database.Database) {
   if (!issueCols.includes('assignee_id')) {
     db.exec(`ALTER TABLE issues ADD COLUMN assignee_id TEXT`);
   }
+  if (!issueCols.includes('created_by')) {
+    db.exec(`ALTER TABLE issues ADD COLUMN created_by TEXT`);
+  }
 
   // 기존 issues의 project_id → issue_project_id 마이그레이션
   if (issueCols.includes('project_id')) {

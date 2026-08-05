@@ -1,11 +1,11 @@
 import { withDb } from '@/lib/auth';
 import { renumberIssues, renumberChildren } from '@/lib/db';
 import { getRegistry } from '@/lib/registry';
-import { sendAssignedNotification, sendStatusChangeNotification } from '@/lib/mail';
+import { sendAssignedNotification, sendStatusChangeNotification, sendIssueChangedNotification } from '@/lib/mail';
 import { NextResponse } from 'next/server';
 
-type IssueRow = { id: number; issue_id: string; title: string; status: string; assignee_id: string | null; issue_project_id: number };
-type Profile = { email: string; email_verified: number; notify_assigned: number; notify_status_change: number };
+type IssueRow = { id: number; issue_id: string; title: string; status: string; assignee_id: string | null; issue_project_id: number; created_by: string | null };
+type Profile = { email: string; email_verified: number; notify_assigned: number; notify_status_change: number; notify_issue_changed: number };
 
 function getProfile(userId: string): Profile | undefined {
   return getRegistry().prepare('SELECT * FROM user_profiles WHERE user_id=? AND email_verified=1').get(userId) as Profile | undefined;
@@ -74,23 +74,52 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // 메일 알림 (비동기, 실패해도 응답에 영향 없음)
   if (before) {
     const projectName = getProjectName(db, after.issue_project_id);
+    const changer = r.userId;
+    const createdBy = after.created_by;
 
+    // 담당자 배정 알림 (변경자 != 담당자)
     if ('assignee_id' in body && body.assignee_id && body.assignee_id !== before.assignee_id) {
-      const p = getProfile(body.assignee_id);
-      if (p?.notify_assigned) {
-        sendAssignedNotification(p.email, {
-          assignee: body.assignee_id, issueId: after.issue_id, title: after.title, projectName,
-        }).catch(() => {});
+      if (body.assignee_id !== changer) {
+        const p = getProfile(body.assignee_id);
+        if (p?.notify_assigned) {
+          sendAssignedNotification(p.email, {
+            assignee: body.assignee_id, issueId: after.issue_id, title: after.title, projectName,
+          }).catch(() => {});
+        }
+      }
+      // 작성자 알림: 담당자가 변경됨 (변경자 != 작성자, 작성자 != 담당자 → 중복 방지)
+      if (createdBy && createdBy !== changer && createdBy !== body.assignee_id) {
+        const p = getProfile(createdBy);
+        if (p?.notify_issue_changed) {
+          sendIssueChangedNotification(p.email, {
+            issueId: after.issue_id, title: after.title, projectName,
+            changeType: '담당자 변경', newValue: body.assignee_id,
+          }).catch(() => {});
+        }
       }
     }
 
-    if ('status' in body && body.status !== before.status && after.assignee_id) {
-      const p = getProfile(after.assignee_id);
-      if (p?.notify_status_change) {
-        sendStatusChangeNotification(p.email, {
-          issueId: after.issue_id, title: after.title, projectName,
-          oldStatus: before.status, newStatus: body.status,
-        }).catch(() => {});
+    // 상태 변경 알림
+    if ('status' in body && body.status !== before.status) {
+      // 담당자에게 (변경자 != 담당자)
+      if (after.assignee_id && after.assignee_id !== changer) {
+        const p = getProfile(after.assignee_id);
+        if (p?.notify_status_change) {
+          sendStatusChangeNotification(p.email, {
+            issueId: after.issue_id, title: after.title, projectName,
+            oldStatus: before.status, newStatus: body.status,
+          }).catch(() => {});
+        }
+      }
+      // 작성자에게 (변경자 != 작성자, 작성자 != 담당자 → 중복 방지)
+      if (createdBy && createdBy !== changer && createdBy !== after.assignee_id) {
+        const p = getProfile(createdBy);
+        if (p?.notify_issue_changed) {
+          sendIssueChangedNotification(p.email, {
+            issueId: after.issue_id, title: after.title, projectName,
+            changeType: '상태 변경', newValue: body.status,
+          }).catch(() => {});
+        }
       }
     }
   }

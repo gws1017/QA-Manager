@@ -33,6 +33,7 @@ export function getRegistry(): Database.Database {
       display_name TEXT,
       notify_assigned INTEGER NOT NULL DEFAULT 1,
       notify_status_change INTEGER NOT NULL DEFAULT 1,
+      notify_issue_changed INTEGER NOT NULL DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now','localtime'))
     );
     CREATE TABLE IF NOT EXISTS email_verifications (
@@ -47,6 +48,9 @@ export function getRegistry(): Database.Database {
   const profileCols = registry.prepare("PRAGMA table_info(user_profiles)").all() as { name: string }[];
   if (profileCols.length > 0 && !profileCols.some(c => c.name === 'display_name')) {
     registry.exec(`ALTER TABLE user_profiles ADD COLUMN display_name TEXT`);
+  }
+  if (profileCols.length > 0 && !profileCols.some(c => c.name === 'notify_issue_changed')) {
+    registry.exec(`ALTER TABLE user_profiles ADD COLUMN notify_issue_changed INTEGER NOT NULL DEFAULT 1`);
   }
 
   return registry;

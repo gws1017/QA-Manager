@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, CheckCircle, ArrowRight, RefreshCw } from 'lucide-react';
 
-type Profile = { email: string; email_verified: number; display_name: string | null; notify_assigned: number; notify_status_change: number };
+type Profile = { email: string; email_verified: number; display_name: string | null; notify_assigned: number; notify_status_change: number; notify_issue_changed: number };
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -17,6 +17,7 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState('');
   const [notifyAssigned, setNotifyAssigned] = useState(true);
   const [notifyStatus, setNotifyStatus] = useState(true);
+  const [notifyIssueChanged, setNotifyIssueChanged] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -26,6 +27,7 @@ export default function ProfilePage() {
         setDisplayName(p.display_name ?? '');
         setNotifyAssigned(!!p.notify_assigned);
         setNotifyStatus(!!p.notify_status_change);
+        setNotifyIssueChanged(!!p.notify_issue_changed);
       }
     });
   }, []);
@@ -60,7 +62,7 @@ export default function ProfilePage() {
     setSaving(true);
     await fetch('/api/profile/notify', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ display_name: displayName, notify_assigned: notifyAssigned, notify_status_change: notifyStatus }),
+      body: JSON.stringify({ display_name: displayName, notify_assigned: notifyAssigned, notify_status_change: notifyStatus, notify_issue_changed: notifyIssueChanged }),
     });
     setSaving(false);
   }
@@ -142,6 +144,7 @@ export default function ProfilePage() {
                 {[
                   ['담당자로 배정될 때', notifyAssigned, setNotifyAssigned] as const,
                   ['담당한 이슈 상태 변경될 때', notifyStatus, setNotifyStatus] as const,
+                  ['내가 작성한 이슈가 변경될 때', notifyIssueChanged, setNotifyIssueChanged] as const,
                 ].map(([label, val, set]) => (
                   <label key={label} className="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" checked={val} onChange={e => set(e.target.checked)}
